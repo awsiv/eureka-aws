@@ -3,102 +3,108 @@ package catalog
 import (
 	"time"
 
+	e "github.com/ArthurHlt/go-eureka-client/eureka"
 	sd "github.com/aws/aws-sdk-go-v2/service/servicediscovery"
-	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
 
 // Sync aws->consul and vice versa.
-func Sync(toAWS, toConsul bool, namespaceID, consulPrefix, awsPrefix, awsPullInterval string, awsDNSTTL int64, stale bool, awsClient *sd.ServiceDiscovery, consulClient *api.Client, stop, stopped chan struct{}) {
+
+func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInterval string, awsDNSTTL int64, stale bool, awsClient *sd.ServiceDiscovery, eurekaClient *e.Client, stop, stopped chan struct{}) {
 	defer close(stopped)
 	log := hclog.Default().Named("sync")
-	consul := consul{
-		client:       consulClient,
-		log:          hclog.Default().Named("consul"),
-		trigger:      make(chan bool, 1),
-		consulPrefix: consulPrefix,
-		awsPrefix:    awsPrefix,
-		toAWS:        toAWS,
-		stale:        stale,
-	}
+
 	pullInterval, err := time.ParseDuration(awsPullInterval)
 	if err != nil {
 		log.Error("cannot parse aws pull interval", "error", err)
 		return
 	}
+
+	eureka := eureka{
+		client:       eurekaClient,
+		log:          hclog.Default().Named("eureka"),
+		trigger:      make(chan bool, 1),
+		eurekaPrefix: eurekaPrefix,
+		awsPrefix:    awsPrefix,
+		toAWS:        toAWS,
+		stale:        stale,
+		pullInterval: pullInterval,
+	}
+
 	aws := aws{
 		client:       awsClient,
 		log:          hclog.Default().Named("aws"),
 		trigger:      make(chan bool, 1),
-		consulPrefix: consulPrefix,
+		eurekaPrefix: eurekaPrefix,
 		awsPrefix:    awsPrefix,
-		toConsul:     toConsul,
+		toEureka:     toEureka,
 		pullInterval: pullInterval,
 		dnsTTL:       awsDNSTTL,
 	}
-
-	err = aws.setupNamespace(namespaceID)
+	// todo: fix aws client init
+	/*err = aws.setupNamespace(namespaceID)
 	if err != nil {
 		log.Error("cannot setup namespace", "error", err)
 		return
 	}
+	*/
 
-	fetchConsulStop := make(chan struct{})
-	fetchConsulStopped := make(chan struct{})
-	go consul.fetchIndefinetely(fetchConsulStop, fetchConsulStopped)
+	fetchEurekaStop := make(chan struct{})
+	fetchEurekaStopped := make(chan struct{})
+	go eureka.fetchIndefinetely(fetchEurekaStop, fetchEurekaStopped)
 	fetchAWSStop := make(chan struct{})
 	fetchAWSStopped := make(chan struct{})
-	go aws.fetchIndefinetely(fetchAWSStop, fetchAWSStopped)
+	//go aws.fetchIndefinetely(fetchAWSStop, fetchAWSStopped)
 
-	toConsulStop := make(chan struct{})
-	toConsulStopped := make(chan struct{})
+	toEurekaStop := make(chan struct{})
+	toEurekaStopped := make(chan struct{})
 	toAWSStop := make(chan struct{})
 	toAWSStopped := make(chan struct{})
 
-	go aws.sync(&consul, toConsulStop, toConsulStopped)
-	go consul.sync(&aws, toAWSStop, toAWSStopped)
+	//go aws.sync(&eureka, toEurekaStop, toEurekaStopped)
+	go eureka.sync(&aws, toAWSStop, toAWSStopped)
 
 	select {
 	case <-stop:
-		close(toConsulStop)
+		close(toEurekaStop)
 		close(toAWSStop)
-		close(fetchConsulStop)
+		close(fetchEurekaStop)
 		close(fetchAWSStop)
-		<-toConsulStopped
+		<-toEurekaStopped
 		<-toAWSStopped
 		<-fetchAWSStopped
-		<-fetchConsulStopped
+		<-fetchEurekaStopped
 	case <-fetchAWSStopped:
-		log.Info("problem wit aws fetch. shutting down...")
-		close(toConsulStop)
+		log.Info("problem with aws fetch. shutting down...")
+		close(toEurekaStop)
 		close(toAWSStop)
-		close(fetchConsulStop)
-		<-toConsulStopped
+		close(fetchEurekaStop)
+		<-toEurekaStopped
 		<-toAWSStopped
-		<-fetchConsulStopped
-	case <-fetchConsulStopped:
+		<-fetchEurekaStopped
+	case <-fetchEurekaStopped:
 		log.Info("problem with consul fetch. shutting down...")
-		close(toConsulStop)
+		close(toEurekaStop)
 		close(fetchAWSStop)
 		close(toAWSStop)
-		<-toConsulStopped
+		<-toEurekaStopped
 		<-toAWSStopped
 		<-fetchAWSStopped
-	case <-toConsulStopped:
+	case <-toEurekaStopped:
 		log.Info("problem with consul sync. shutting down...")
-		close(fetchConsulStop)
+		close(fetchEurekaStop)
 		close(toAWSStop)
 		close(fetchAWSStop)
 		<-toAWSStopped
 		<-fetchAWSStopped
-		<-fetchConsulStopped
+		<-fetchEurekaStopped
 	case <-toAWSStopped:
 		log.Info("problem with aws sync. shutting down...")
-		close(toConsulStop)
-		close(fetchConsulStop)
+		close(toEurekaStop)
+		close(fetchEurekaStop)
 		close(fetchAWSStop)
-		<-toConsulStopped
-		<-fetchConsulStopped
+		<-toEurekaStopped
+		<-fetchEurekaStopped
 		<-fetchAWSStopped
 	}
 }

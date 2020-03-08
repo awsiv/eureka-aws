@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"sync"
 
+	e "github.com/ArthurHlt/go-eureka-client/eureka"
 	sd "github.com/aws/aws-sdk-go-v2/service/servicediscovery"
 	"github.com/hashicorp/consul-aws/catalog"
 	"github.com/hashicorp/consul-aws/subcommand"
@@ -82,23 +83,20 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error("Please provide -aws-namespace-id.")
 		return 1
 	}
+
 	config, err := subcommand.AWSConfig()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error retrieving AWS session: %s", err))
-		return 1
+		//return 1
 	}
 	awsClient := sd.New(config)
 
-	consulClient, err := c.http.APIClient()
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
+	eurekaClient := e.NewClient([]string{
+		"http://ec2-52-70-156-143.compute-1.amazonaws.com:8080/eureka/v2",
+	})
+	if eurekaClient == nil {
+		c.UI.Error(fmt.Sprintf("Error connecting to Eureka agent: %s", err))
 		return 1
-	}
-
-	pollInterval := c.flagAWSPollInterval
-	if pollInterval == DefaultPollInterval && c.flagAWSDeprecatedPullInterval != DefaultPollInterval {
-		c.UI.Info("Please use -aws-poll-interval instead of the deprecated -aws-pull-interval")
-		pollInterval = c.flagAWSDeprecatedPullInterval
 	}
 
 	stop := make(chan struct{})
@@ -106,8 +104,8 @@ func (c *Command) Run(args []string) int {
 	go catalog.Sync(
 		c.flagToAWS, c.flagToConsul, c.flagAWSNamespaceID,
 		c.flagConsulServicePrefix, c.flagAWSServicePrefix,
-		pollInterval, c.flagAWSDNSTTL, c.getStaleWithDefaultTrue(),
-		awsClient, consulClient,
+		"60s", c.flagAWSDNSTTL, c.getStaleWithDefaultTrue(),
+		awsClient, eurekaClient,
 		stop, stopped,
 	)
 
@@ -142,7 +140,7 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Sync AWS services and Consul services."
+const synopsis = "Sync AWS services and Eureka services."
 const help = `
 Usage: consul-aws sync-catalog [options]
 

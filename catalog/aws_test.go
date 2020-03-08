@@ -55,8 +55,8 @@ func TestAWSTransformServices(t *testing.T) {
 		{Id: x.String("two"), Name: x.String("redis")},
 	}
 	expected := map[string]service{
-		"web":   {id: "one", name: "web", awsID: "one", fromConsul: true},
-		"redis": {id: "two", name: "redis", awsID: "two", fromConsul: false},
+		"web":   {id: "one", name: "web", awsID: "one", fromEureka: true},
+		"redis": {id: "two", name: "redis", awsID: "two", fromEureka: false},
 	}
 	require.Equal(t, expected, a.transformServices(services))
 }

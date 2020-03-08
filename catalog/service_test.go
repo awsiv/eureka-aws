@@ -21,33 +21,33 @@ func TestOnlyInFirst(t *testing.T) {
 		},
 		{
 			a: map[string]service{
-				"s1": {fromConsul: true},
+				"s1": {fromEureka: true},
 			},
 			b: map[string]service{},
 			expected: map[string]service{
-				"s1": {fromConsul: true},
+				"s1": {fromEureka: true},
 			},
 		},
 		{
 			a: map[string]service{
-				"s2": {fromConsul: true, nodes: map[string]map[int]node{"h1": {1: {}}}},
+				"s2": {fromEureka: true, nodes: map[string]map[int]node{"h1": {1: {}}}},
 			},
 			b: map[string]service{
 				"s2": {nodes: map[string]map[int]node{"h2": {2: {}}}},
 			},
 			expected: map[string]service{
-				"s2": {fromConsul: true, nodes: map[string]map[int]node{"h1": {1: {}}}},
+				"s2": {fromEureka: true, nodes: map[string]map[int]node{"h1": {1: {}}}},
 			},
 		},
 		{
 			a: map[string]service{
-				"s3": {fromConsul: false, nodes: map[string]map[int]node{"h1": {1: {port: 1}}}},
+				"s3": {fromEureka: false, nodes: map[string]map[int]node{"h1": {1: {port: 1}}}},
 			},
 			b: map[string]service{
-				"s3": {fromConsul: true, nodes: map[string]map[int]node{"h2": {2: {port: 2}}}},
+				"s3": {fromEureka: true, nodes: map[string]map[int]node{"h2": {2: {port: 2}}}},
 			},
 			expected: map[string]service{
-				"s3": {fromConsul: true, nodes: map[string]map[int]node{"h1": {1: {port: 1}}}},
+				"s3": {fromEureka: true, nodes: map[string]map[int]node{"h1": {1: {port: 1}}}},
 			},
 		},
 		{
@@ -185,10 +185,10 @@ func TestOnlyInFirst(t *testing.T) {
 				"s19": {nodes: map[string]map[int]node{"h1": {1: {port: 1}}, "h2": {2: {port: 2}}}},
 			},
 			b: map[string]service{
-				"s19": {consulID: "id", nodes: map[string]map[int]node{"h2": {2: {port: 2}}}},
+				"s19": {eurekaID: "id", nodes: map[string]map[int]node{"h2": {2: {port: 2}}}},
 			},
 			expected: map[string]service{
-				"s19": {consulID: "id", nodes: map[string]map[int]node{"h1": {1: {port: 1}}}},
+				"s19": {eurekaID: "id", nodes: map[string]map[int]node{"h1": {1: {port: 1}}}},
 			},
 		},
 		{

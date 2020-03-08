@@ -34,38 +34,19 @@ type aws struct {
 	namespace    namespace
 	services     map[string]service
 	trigger      chan bool
-	consulPrefix string
+	eurekaPrefix string
 	awsPrefix    string
-	toConsul     bool
+	toEureka     bool
 	pullInterval time.Duration
 	dnsTTL       int64
 }
 
-var awsServiceDescription = "Imported from Consul"
+var awsServiceDescription = "Imported from Eureka"
 
-func (a *aws) sync(consul *consul, stop, stopped chan struct{}) {
-	defer close(stopped)
-	for {
-		select {
-		case <-a.trigger:
-			if !a.toConsul {
-				continue
-			}
-			create := onlyInFirst(a.getServices(), consul.getServices())
-			count := consul.create(create)
-			if count > 0 {
-				consul.log.Info("created", "count", fmt.Sprintf("%d", count))
-			}
-
-			remove := onlyInFirst(consul.getServices(), a.getServices())
-			count = consul.remove(remove)
-			if count > 0 {
-				consul.log.Info("removed", "count", fmt.Sprintf("%d", count))
-			}
-		case <-stop:
-			return
-		}
-	}
+func (a *aws) sync(eureka *eureka, stop, stopped chan struct{}) {
+	/*
+	* TODO: sync to eureka
+	 */
 }
 
 func (a *aws) fetchNamespace(id string) (*sd.Namespace, error) {
@@ -103,8 +84,8 @@ func (a *aws) transformServices(awsServices []sd.ServiceSummary) map[string]serv
 			awsNamespace: a.namespace.id,
 		}
 		if as.Description != nil && *as.Description == awsServiceDescription {
-			s.fromConsul = true
-			s.name = strings.TrimPrefix(s.name, a.consulPrefix)
+			s.fromEureka = true
+			s.name = strings.TrimPrefix(s.name, a.eurekaPrefix)
 		}
 
 		services[s.name] = s
@@ -139,8 +120,8 @@ func (a *aws) fetch() error {
 		var awsNodes []sd.InstanceSummary
 		var err error
 		name := s.name
-		if s.fromConsul {
-			name = a.consulPrefix + name
+		if s.fromEureka {
+			name = a.eurekaPrefix + name
 		}
 		awsNodes, err = a.discoverNodes(name)
 		if err != nil {
@@ -158,7 +139,7 @@ func (a *aws) fetch() error {
 		if err != nil {
 			a.log.Error("cannot fetch healths", "error", err)
 		} else {
-			if s.fromConsul {
+			if s.fromEureka {
 				healths = a.rekeyHealths(s.name, healths)
 			}
 			s.healths = healths
@@ -170,7 +151,7 @@ func (a *aws) fetch() error {
 	return nil
 }
 
-func (a *aws) getNodeForConsulID(name, id string) (node, bool) {
+func (a *aws) getNodeForEurekaID(name, id string) (node, bool) {
 	a.lock.RLock()
 	copy, ok := a.services[name]
 	a.lock.RUnlock()
@@ -179,7 +160,7 @@ func (a *aws) getNodeForConsulID(name, id string) (node, bool) {
 	}
 	for _, nodes := range copy.nodes {
 		for _, n := range nodes {
-			if n.consulID == id {
+			if n.eurekaID == id {
 				return n, true
 			}
 		}
@@ -194,7 +175,7 @@ func (a *aws) rekeyHealths(name string, healths map[string]health) map[string]he
 		return nil
 	}
 	for k, h := range s.healths {
-		if n, ok := a.getNodeForConsulID(name, k); ok {
+		if n, ok := a.getNodeForEurekaID(name, k); ok {
 			rekeyed[id(k, n.host, n.port)] = h
 		}
 	}
@@ -325,7 +306,7 @@ func (a *aws) create(services map[string]service) int {
 		if s.fromAWS {
 			continue
 		}
-		name := a.consulPrefix + k
+		name := a.eurekaPrefix + k
 		if len(s.awsID) == 0 {
 			input := sd.CreateServiceInput{
 				Description: &awsServiceDescription,
@@ -400,7 +381,7 @@ func (a *aws) create(services map[string]service) int {
 func (a *aws) remove(services map[string]service) int {
 	wg := sync.WaitGroup{}
 	for _, s := range services {
-		if !s.fromConsul || len(s.awsID) == 0 {
+		if !s.fromEureka || len(s.awsID) == 0 {
 			continue
 		}
 		for h, nodes := range s.nodes {
@@ -424,7 +405,7 @@ func (a *aws) remove(services map[string]service) int {
 
 	count := 0
 	for k, s := range services {
-		if !s.fromConsul || len(s.awsID) == 0 {
+		if !s.fromEureka || len(s.awsID) == 0 {
 			continue
 		}
 		origService, _ := a.getService(k)

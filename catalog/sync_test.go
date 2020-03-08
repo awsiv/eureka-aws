@@ -33,7 +33,7 @@ func runSyncTest(t *testing.T, namespaceID string) {
 	f := flags.HTTPFlags{}
 	c, err := f.APIClient()
 	if err != nil {
-		t.Fatalf("Error connecting to Consul agent: %s", err)
+		t.Fatalf("Error connecting to Eureka agent: %s", err)
 	}
 
 	cID := "r1"
@@ -42,7 +42,7 @@ func runSyncTest(t *testing.T, namespaceID string) {
 
 	err = createServiceInConsul(c, cID, cName)
 	if err != nil {
-		t.Fatalf("error creating service in Consul: %s", err)
+		t.Fatalf("error creating service in Eureka: %s", err)
 	}
 
 	aID, err := createServiceInAWS(a, namespaceID, aName)
@@ -58,9 +58,9 @@ func runSyncTest(t *testing.T, namespaceID string) {
 	stopped := make(chan struct{})
 	go Sync(
 		true, true, namespaceID,
-		"consul_", "aws_",
+		"eureka_", "aws_",
 		"0", 0, true,
-		a, c,
+		a, nil,
 		stop, stopped,
 	)
 

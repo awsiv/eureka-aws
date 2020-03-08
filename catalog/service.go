@@ -19,10 +19,10 @@ type service struct {
 	name         string
 	nodes        map[string]map[int]node
 	healths      map[string]health
-	fromConsul   bool
+	fromEureka   bool
 	fromAWS      bool
 	awsID        string
-	consulID     string
+	eurekaID     string
 	awsNamespace string
 }
 
@@ -30,7 +30,7 @@ type node struct {
 	port       int
 	host       string
 	awsID      string
-	consulID   string
+	eurekaID   string
 	attributes map[string]string
 }
 
@@ -98,9 +98,9 @@ func onlyInFirst(servicesA, servicesB map[string]service) map[string]service {
 			if len(aid) == 0 {
 				aid = sb.awsID
 			}
-			cid := sa.consulID
+			cid := sa.eurekaID
 			if len(cid) == 0 {
-				cid = sb.consulID
+				cid = sb.eurekaID
 			}
 			ns := sa.awsNamespace
 			if len(ns) == 0 {
@@ -110,9 +110,9 @@ func onlyInFirst(servicesA, servicesB map[string]service) map[string]service {
 				id:           id,
 				name:         name,
 				awsID:        aid,
-				consulID:     cid,
+				eurekaID:     cid,
 				awsNamespace: ns,
-				fromConsul:   sa.fromConsul || sb.fromConsul,
+				fromEureka:   sa.fromEureka || sb.fromEureka,
 				fromAWS:      sa.fromAWS || sb.fromAWS,
 			}
 			if len(nodes) > 0 {
