@@ -10,8 +10,8 @@ GOTOOLS = \
 	golang.org/x/tools/cmd/cover \
 	golang.org/x/tools/cmd/stringer
 
-DEV_IMAGE?=consul-aws-dev
-GO_BUILD_TAG?=consul-aws-build-go
+DEV_IMAGE?=eureka-aws-dev
+GO_BUILD_TAG?=eureka-aws-build-go
 GIT_COMMIT?=$(shell git rev-parse --short HEAD)
 GIT_DIRTY?=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
 GIT_DESCRIBE?=$(shell git describe --tags --always)
@@ -19,7 +19,7 @@ GIT_IMPORT=github.com/hashicorp/consul-aws/version
 GOLDFLAGS=-X $(GIT_IMPORT).GitCommit=$(GIT_COMMIT)$(GIT_DIRTY) -X $(GIT_IMPORT).GitDescribe=$(GIT_DESCRIBE)
 
 # Docker Image publishing variables
-DOCKER_IMAGE_NAME=consul-aws
+DOCKER_IMAGE_NAME=eureka-aws
 DOCKER_ORG=hashicorp
 export DOCKER_IMAGE_NAME
 export DOCKER_ORG
