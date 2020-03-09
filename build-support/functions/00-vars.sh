@@ -1,4 +1,4 @@
-PROJECT="consul-aws"
+PROJECT="eureka-aws"
 
 # GPG Key ID to use for publically released builds
 HASHICORP_GPG_KEY="348FFC4C"
