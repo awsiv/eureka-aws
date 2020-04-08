@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	cmdSyncCatalog "github.com/hashicorp/consul-aws/subcommand/sync-catalog"
-	cmdVersion "github.com/hashicorp/consul-aws/subcommand/version"
-	"github.com/hashicorp/consul-aws/version"
+	cmdSyncCatalog "github.com/awsiv/eureka-aws/subcommand/sync-catalog"
+	cmdVersion "github.com/awsiv/eureka-aws/subcommand/version"
+	"github.com/awsiv/eureka-aws/version"
 	"github.com/mitchellh/cli"
 )
 
