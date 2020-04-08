@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/hashicorp/consul-aws/version"
+	"github.com/awsiv/eureka-aws/version"
 	"github.com/mitchellh/cli"
 )
 

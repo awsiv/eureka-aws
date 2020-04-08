@@ -9,8 +9,8 @@ import (
 
 	e "github.com/ArthurHlt/go-eureka-client/eureka"
 	sd "github.com/aws/aws-sdk-go-v2/service/servicediscovery"
-	"github.com/hashicorp/consul-aws/catalog"
-	"github.com/hashicorp/consul-aws/subcommand"
+	"github.com/awsiv/eureka-aws/catalog"
+	"github.com/awsiv/eureka-aws/subcommand"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/mitchellh/cli"
 )
@@ -80,17 +80,20 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if len(c.flagAWSNamespaceID) == 0 {
-		c.UI.Error("Please provide -aws-namespace-id.")
+		c.UI.Error("Please provide -aws-namespace-id. ---")
 		return 1
 	}
 
 	config, err := subcommand.AWSConfig()
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error retrieving AWS session: %s", err))
+		//c.UI.Error(fmt.Sprintf("Error retrieving AWS session: %s", err))
+		// TODO: fix aws auth
 		//return 1
+		c.UI.Info("error")
 	}
 	awsClient := sd.New(config)
 
+	c.UI.Error(fmt.Sprintf("Moving on.."))
 	eurekaClient := e.NewClient([]string{
 		"http://ec2-52-70-156-143.compute-1.amazonaws.com:8080/eureka/v2",
 	})
