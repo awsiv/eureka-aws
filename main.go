@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	c := cli.NewCLI("consul-aws", version.GetHumanVersion())
+	c := cli.NewCLI("eureka-aws", version.GetHumanVersion())
 	c.Args = os.Args[1:]
 	c.Commands = Commands
 	c.HelpFunc = helpFunc()

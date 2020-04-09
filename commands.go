@@ -9,7 +9,7 @@ import (
 	"github.com/mitchellh/cli"
 )
 
-// Commands is the mapping of all available consul-aws commands.
+// Commands is the mapping of all available eureka-aws commands.
 var Commands map[string]cli.CommandFactory
 
 func init() {
@@ -42,5 +42,5 @@ func helpFunc() cli.HelpFunc {
 		}
 	}
 
-	return cli.FilteredHelpFunc(include, cli.BasicHelpFunc("consul-aws"))
+	return cli.FilteredHelpFunc(include, cli.BasicHelpFunc("eureka-aws"))
 }

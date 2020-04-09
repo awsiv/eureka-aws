@@ -28,13 +28,6 @@ type eureka struct {
 	pullInterval time.Duration
 }
 
-/*
-const (
-	ConsulAWSNodeName = "consul-aws"
-	WaitTime          = 10
-)
-*/
-
 func (e *eureka) getServices() map[string]service {
 	e.lock.RLock()
 	copy := e.services

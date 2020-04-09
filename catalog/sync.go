@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-// Sync aws->consul and vice versa.
+// Sync aws->eureka and vice versa.
 
 func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInterval string, awsDNSTTL int64, stale bool, awsClient *sd.Client, eurekaClient *e.Client, stop, stopped chan struct{}) {
 	defer close(stopped)
@@ -83,7 +83,7 @@ func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInt
 		<-toAWSStopped
 		<-fetchEurekaStopped
 	case <-fetchEurekaStopped:
-		log.Info("problem with consul fetch. shutting down...")
+		log.Info("problem with eureka fetch. shutting down...")
 		close(toEurekaStop)
 		close(fetchAWSStop)
 		close(toAWSStop)
@@ -92,7 +92,7 @@ func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInt
 		<-fetchAWSStopped
 
 	case <-toEurekaStopped:
-		log.Info("problem with consul sync. shutting down...")
+		log.Info("problem with eureka sync. shutting down...")
 		close(fetchEurekaStop)
 		close(toAWSStop)
 		close(fetchAWSStop)

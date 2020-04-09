@@ -14,14 +14,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-const (
-	// ConsulAWSTag is used for imported services from AWS
-	ConsulAWSTag    = "aws"
-	ConsulSourceKey = "external-source"
-	ConsulAWSNS     = "external-aws-ns"
-	ConsulAWSID     = "external-aws-id"
-)
-
 type namespace struct {
 	id     string
 	name   string
