@@ -2,6 +2,10 @@ package catalog
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+	"runtime/debug"
+	"runtime/pprof"
 	"sync"
 	"time"
 
@@ -134,6 +138,7 @@ func (e *eureka) sync(aws *aws, stop, stopped chan struct{}) {
 				e.log.Info("removed", "count", fmt.Sprintf("%d", count))
 			}
 		case <-stop:
+			e.log.Info("sync()", "stopped", 1)
 			return
 		}
 	}
@@ -164,7 +169,7 @@ func (e *eureka) transformNodes(cnodes []e.InstanceInfo) map[string]map[int]node
 
 		ports[n.Port.Port] = node{port: n.Port.Port, host: attributes["local-ipv4"], eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: n.DataCenterInfo.Metadata.InstanceId}
 		nodes[privateip] = ports
-		e.log.Debug("transformNodes", "port", n.Port.Port, "ipAddr", n.IpAddr, "attributes", attributes, "instanceId", n.DataCenterInfo.Metadata.InstanceId)
+		e.log.Debug("transformNodes()", "port", n.Port.Port, "ipAddr", n.IpAddr, "attributes", attributes, "instanceId", n.DataCenterInfo.Metadata.InstanceId)
 	}
 	return nodes
 }
@@ -183,7 +188,7 @@ func (e *eureka) transformHealth(ehealths []e.InstanceInfo) map[string]health {
 
 	for _, h := range ehealths {
 		instanceId := h.DataCenterInfo.Metadata.InstanceId
-		e.log.Info("transformHealth()", "instance", instanceId, "status", h.Status)
+		e.log.Info("transformHealth()", "instanceID", instanceId, "status", h.Status)
 
 		switch h.Status {
 		case "UP":
@@ -243,7 +248,7 @@ func (e *eureka) transformServices(apps *e.Applications) map[string]service {
 				}
 			*/
 
-			e.log.Info("transformServices", "instanceID", v.Instances[0].DataCenterInfo.Metadata.InstanceId)
+			e.log.Info("transformServices()", "serviceName", v.Name)
 			s.nodes = e.transformNodes(v.Instances)
 			s.healths = e.transformHealth(v.Instances)
 
@@ -264,6 +269,16 @@ func (e *eureka) rekeyHealths(name string, healths map[string]health) map[string
 	return rekeyed
 }
 
+func countGoRoutines() int {
+	return runtime.NumGoroutine()
+}
+
+func getStackTraceHandler() {
+	stack := debug.Stack()
+	os.Stdout.Write(stack)
+	pprof.Lookup("goroutine").WriteTo(os.Stdout, 2)
+}
+
 func (e *eureka) fetchIndefinetely(stop, stopped chan struct{}) {
 	defer close(stopped)
 
@@ -278,6 +293,8 @@ func (e *eureka) fetchIndefinetely(stop, stopped chan struct{}) {
 		case <-stop:
 			return
 		case <-time.After(e.pullInterval):
+			e.log.Info("goroutine", "count", countGoRoutines())
+			//getStackTraceHandler()
 			continue
 		}
 	}

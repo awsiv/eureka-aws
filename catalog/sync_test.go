@@ -142,7 +142,7 @@ func deleteServiceInConsul(c *api.Client, id string) {
 	c.Catalog().Deregister(&api.CatalogDeregistration{Node: ConsulAWSNodeName, ServiceID: id}, nil)
 }
 
-func createServiceInAWS(a *sd.ServiceDiscovery, namespaceID, name string) (string, error) {
+func createServiceInAWS(a *sd.Client, namespaceID, name string) (string, error) {
 	ttl := int64(60)
 	input := sd.CreateServiceInput{
 		Name:        &name,
@@ -163,7 +163,7 @@ func createServiceInAWS(a *sd.ServiceDiscovery, namespaceID, name string) (strin
 	return *resp.Service.Id, nil
 }
 
-func createInstanceInAWS(a *sd.ServiceDiscovery, serviceID string) error {
+func createInstanceInAWS(a *sd.Client, serviceID string) error {
 	req := a.RegisterInstanceRequest(&sd.RegisterInstanceInput{
 		ServiceId:  &serviceID,
 		InstanceId: &serviceID,
@@ -177,13 +177,13 @@ func createInstanceInAWS(a *sd.ServiceDiscovery, serviceID string) error {
 	return err
 }
 
-func deleteInstanceInAWS(a *sd.ServiceDiscovery, id string) error {
+func deleteInstanceInAWS(a *sd.Client, id string) error {
 	req := a.DeregisterInstanceRequest(&sd.DeregisterInstanceInput{ServiceId: &id, InstanceId: &id})
 	_, err := req.Send()
 	return err
 }
 
-func deleteServiceInAWS(a *sd.ServiceDiscovery, id string) error {
+func deleteServiceInAWS(a *sd.Client, id string) error {
 	var err error
 	for i := 0; i < 50; i++ {
 		req := a.DeleteServiceRequest(&sd.DeleteServiceInput{Id: &id})
@@ -239,7 +239,7 @@ func checkForImportedAWSService(c *api.Client, name, namespaceID, serviceID stri
 	return fmt.Errorf("shrug")
 }
 
-func checkForImportedConsulService(a *sd.ServiceDiscovery, namespaceID, name string, repeat int) error {
+func checkForImportedConsulService(a *sd.Client, namespaceID, name string, repeat int) error {
 	for i := 0; i < repeat; i++ {
 		req := a.ListServicesRequest(&sd.ListServicesInput{
 			Filters: []sd.ServiceFilter{{

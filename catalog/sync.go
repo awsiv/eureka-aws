@@ -50,17 +50,18 @@ func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInt
 
 	fetchEurekaStop := make(chan struct{})
 	fetchEurekaStopped := make(chan struct{})
-	go eureka.fetchIndefinetely(fetchEurekaStop, fetchEurekaStopped)
 	fetchAWSStop := make(chan struct{})
 	fetchAWSStopped := make(chan struct{})
+
 	go aws.fetchIndefinetely(fetchAWSStop, fetchAWSStopped)
+	go eureka.fetchIndefinetely(fetchEurekaStop, fetchEurekaStopped)
 
 	toEurekaStop := make(chan struct{})
 	toEurekaStopped := make(chan struct{})
 	toAWSStop := make(chan struct{})
 	toAWSStopped := make(chan struct{})
 
-	//go aws.sync(&eureka, toEurekaStop, toEurekaStopped)
+	go aws.sync(&eureka, toEurekaStop, toEurekaStopped)
 	go eureka.sync(&aws, toAWSStop, toAWSStopped)
 
 	select {
@@ -89,6 +90,7 @@ func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInt
 		<-toEurekaStopped
 		<-toAWSStopped
 		<-fetchAWSStopped
+
 	case <-toEurekaStopped:
 		log.Info("problem with consul sync. shutting down...")
 		close(fetchEurekaStop)
@@ -97,6 +99,7 @@ func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInt
 		<-toAWSStopped
 		<-fetchAWSStopped
 		<-fetchEurekaStopped
+
 	case <-toAWSStopped:
 		log.Info("problem with aws sync. shutting down...")
 		close(toEurekaStop)
