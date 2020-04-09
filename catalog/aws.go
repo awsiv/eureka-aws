@@ -60,6 +60,7 @@ func (a *aws) fetchNamespace(id string) (*sd.Namespace, error) {
 }
 
 func (a *aws) fetchServices() ([]sd.ServiceSummary, error) {
+	a.log.Info("fetchServices()", "Start..")
 	req := a.client.ListServicesRequest(&sd.ListServicesInput{
 		Filters: []sd.ServiceFilter{{
 			Name:      sd.ServiceFilterNameNamespaceId,
@@ -72,7 +73,8 @@ func (a *aws) fetchServices() ([]sd.ServiceSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.log.Debug("fetchServices", "resp", resp)
+	a.log.Debug("fetchServices()", "resp", resp)
+	a.log.Info("fetchServices()", "count", len(resp.Services))
 	services := resp.Services
 	return services, nil
 }
@@ -133,12 +135,14 @@ func (a *aws) fetch() error {
 		}
 
 		nodes := a.transformNodes(awsNodes)
+		//a.log.Info("fetch()", "service", s.name, "nodesCount", length(nodes))
 		if len(nodes) == 0 {
 			continue
 		}
 		s.nodes = nodes
 
 		healths, err := a.fetchHealths(s.awsID)
+		a.log.Debug("fetch()", "healths", healths)
 		if err != nil {
 			a.log.Error("cannot fetch healths", "error", err)
 		} else {
@@ -189,11 +193,11 @@ func statusFromAWS(aws sd.HealthStatus) health {
 	var result health
 	switch aws {
 	case sd.HealthStatusHealthy:
-		result = "UP"
+		result = up
 	case sd.HealthStatusUnhealthy:
-		result = "OUT_OF_SERVICE"
+		result = out_of_service
 	case sd.HealthStatusUnknown:
-		result = "UNKNOWN"
+		result = unknown
 	}
 	return result
 }
@@ -201,10 +205,11 @@ func statusFromAWS(aws sd.HealthStatus) health {
 func statusToCustomHealth(h health) sd.CustomHealthStatus {
 	var result sd.CustomHealthStatus
 	switch h {
-	case "UP":
-	case "HEALTHY":
-	case passing:
+	case healthy:
+		fallthrough
+	case up:
 		result = sd.CustomHealthStatusHealthy
+		break
 	default:
 		result = sd.CustomHealthStatusUnhealthy
 	}
@@ -249,15 +254,16 @@ func (a *aws) transformNodes(awsNodes []sd.InstanceSummary) map[string]map[int]n
 	return nodes
 }
 
+// TODO: not used anywhere, remove
 func (a *aws) fetchNodes(id string) ([]sd.InstanceSummary, error) {
 	req := a.client.ListInstancesRequest(&sd.ListInstancesInput{
 		ServiceId: &id,
 	})
 
 	resp, err := req.Send(context.Background())
-	a.log.Info("fetchNodes", "resp", resp)
+	a.log.Debug("fetchNodes", "resp", resp)
 	if err != nil {
-		a.log.Error("fetchNodes", "resp", err)
+		a.log.Error("fetchNodes()", "resp", err)
 		return nil, err
 	}
 
@@ -270,6 +276,7 @@ func (a *aws) fetchNodes(id string) ([]sd.InstanceSummary, error) {
 }
 
 func (a *aws) discoverNodes(name string) ([]sd.InstanceSummary, error) {
+	a.log.Info("discoverNodes()", "Start...")
 	req := a.client.DiscoverInstancesRequest(&sd.DiscoverInstancesInput{
 		HealthStatus:  sd.HealthStatusFilterHealthy,
 		NamespaceName: x.String(a.namespace.name),
@@ -283,6 +290,8 @@ func (a *aws) discoverNodes(name string) ([]sd.InstanceSummary, error) {
 	for _, i := range resp.Instances {
 		nodes = append(nodes, sd.InstanceSummary{Id: i.InstanceId, Attributes: i.Attributes})
 	}
+
+	a.log.Info("discoverNodes()", "service", name, "count", len(resp.Instances))
 	return nodes, nil
 }
 
@@ -306,24 +315,29 @@ func (a *aws) setServices(services map[string]service) {
 	a.lock.Unlock()
 }
 
+//TODO: check if service exists
+//      split create service and register nodes
 func (a *aws) create(services map[string]service) int {
 	wg := sync.WaitGroup{}
 	count := 0
 	for k, s := range services {
-		a.log.Info("create", "serviceName", s.name)
+		a.log.Info("create()", "serviceName", s.name)
 		if s.fromAWS {
 			continue
 		}
 		name := a.eurekaPrefix + k
-		a.log.Info("create", "awsServiceName", name, "namespace", a.namespace.id)
+		a.log.Info("create()", "awsServiceName", name, "namespace", a.namespace.id)
 		if len(s.awsID) == 0 {
 			input := sd.CreateServiceInput{
 				Description: &awsServiceDescription,
 				Name:        &name,
 				NamespaceId: &a.namespace.id,
-				HealthCheckCustomConfig: &sd.HealthCheckCustomConfig{
-					FailureThreshold: x.Int64(10),
-				},
+				/*
+					Probably do not want to configure health check as we will be updating it according to the status in eureka
+					HealthCheckCustomConfig: &sd.HealthCheckCustomConfig{
+						FailureThreshold: x.Int64(10),
+					},
+				*/
 			}
 			if !a.namespace.isHTTP {
 				input.DnsConfig = &sd.DnsConfig{
@@ -352,7 +366,7 @@ func (a *aws) create(services map[string]service) int {
 			a.log.Info("Created service:", "name", name, "ns", a.namespace.id, "desc", awsServiceDescription, "namespaceID", s.awsID)
 			count++
 		}
-		a.log.Info("create", "nodes", s.nodes)
+
 		for h, nodes := range s.nodes {
 			a.log.Info("create", "h", h, "nodes", nodes[0].instanceID)
 			for _, n := range nodes {
@@ -374,7 +388,7 @@ func (a *aws) create(services map[string]service) int {
 					if err != nil {
 						a.log.Error("cannot create nodes", "error", err.Error())
 					}
-					a.log.Info("Registering instance:", "ID", instanceID, "service", serviceID, "ip", h, "attributes", attributes)
+					a.log.Info("Registering instance:", "ID", instanceID, "service", serviceID, "ip", h)
 				}(s.awsID, name, h, n)
 			}
 		}
@@ -382,7 +396,8 @@ func (a *aws) create(services map[string]service) int {
 			a.log.Info("create()", "serviceID", s.awsID, "instanceID", instanceID, "health", statusToCustomHealth(h), "status", h)
 			wg.Add(1)
 			go func(serviceID, instanceID string, h health) {
-				defer wg.Done()
+				//defer wg.Done()
+				wg.Done()
 				req := a.client.UpdateInstanceCustomHealthStatusRequest(&sd.UpdateInstanceCustomHealthStatusInput{
 					ServiceId:  &serviceID,
 					InstanceId: &instanceID,
@@ -391,6 +406,8 @@ func (a *aws) create(services map[string]service) int {
 				_, err := req.Send(context.Background())
 				if err != nil {
 					a.log.Error("cannot create custom health", "error", err.Error())
+				} else {
+					a.log.Info("custom health status updated", "service", serviceID, "instance", instanceID, "new status", h)
 				}
 			}(s.awsID, instanceID, h)
 		}
@@ -401,6 +418,8 @@ func (a *aws) create(services map[string]service) int {
 
 func (a *aws) remove(services map[string]service) int {
 	wg := sync.WaitGroup{}
+	//deletedNodes := []string{}
+
 	for _, s := range services {
 		if !s.fromEureka || len(s.awsID) == 0 {
 			continue
@@ -409,7 +428,10 @@ func (a *aws) remove(services map[string]service) int {
 			for _, n := range nodes {
 				wg.Add(1)
 				go func(serviceID, id string) {
-					defer wg.Done()
+					a.log.Info("remove()", "instanceId", n.awsID, "health", h)
+
+					/*defer*/
+					wg.Done()
 					req := a.client.DeregisterInstanceRequest(&sd.DeregisterInstanceInput{
 						ServiceId:  &serviceID,
 						InstanceId: &id,
@@ -417,8 +439,11 @@ func (a *aws) remove(services map[string]service) int {
 					_, err := req.Send(context.Background())
 					if err != nil {
 						a.log.Error("cannot remove instance", "error", err.Error())
+					} else {
+						// TODO:  remove instance from struct
+						//delete(nodes, n)
 					}
-				}(s.awsID, id(s.awsID, h, n.port))
+				}(s.awsID, n.awsID)
 			}
 		}
 	}
@@ -440,6 +465,7 @@ func (a *aws) remove(services map[string]service) int {
 		if err != nil {
 			a.log.Error("cannot remove services", "name", k, "id", s.awsID, "error", err.Error())
 		} else {
+			// todo remove service from srtuct
 			count++
 		}
 	}

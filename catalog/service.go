@@ -9,9 +9,11 @@ import (
 type health string
 
 const (
-	passing  health = "passing"
-	critical health = "critical"
-	unknown  health = ""
+	up             health = "UP"
+	healthy        health = "HEALTHY"
+	unhealthy      health = "UNHEALTHY"
+	out_of_service health = "OUT_OF_SERVICE"
+	unknown        health = ""
 )
 
 type service struct {
