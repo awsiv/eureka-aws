@@ -10,7 +10,7 @@ import (
 
 // Sync aws->consul and vice versa.
 
-func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInterval string, awsDNSTTL int64, stale bool, awsClient *sd.ServiceDiscovery, eurekaClient *e.Client, stop, stopped chan struct{}) {
+func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInterval string, awsDNSTTL int64, stale bool, awsClient *sd.Client, eurekaClient *e.Client, stop, stopped chan struct{}) {
 	defer close(stopped)
 	log := hclog.Default().Named("sync")
 
@@ -41,20 +41,19 @@ func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInt
 		pullInterval: pullInterval,
 		dnsTTL:       awsDNSTTL,
 	}
-	// todo: fix aws client init
-	/*err = aws.setupNamespace(namespaceID)
+
+	err = aws.setupNamespace(namespaceID)
 	if err != nil {
-		log.Error("cannot setup namespace", "error", err)
+		log.Error("cannot setup namespace", "namespaceID", namespaceID, "error", err)
 		return
 	}
-	*/
 
 	fetchEurekaStop := make(chan struct{})
 	fetchEurekaStopped := make(chan struct{})
 	go eureka.fetchIndefinetely(fetchEurekaStop, fetchEurekaStopped)
 	fetchAWSStop := make(chan struct{})
 	fetchAWSStopped := make(chan struct{})
-	//go aws.fetchIndefinetely(fetchAWSStop, fetchAWSStopped)
+	go aws.fetchIndefinetely(fetchAWSStop, fetchAWSStopped)
 
 	toEurekaStop := make(chan struct{})
 	toEurekaStopped := make(chan struct{})

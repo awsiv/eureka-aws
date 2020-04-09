@@ -120,12 +120,12 @@ func (e *eureka) sync(aws *aws, stop, stopped chan struct{}) {
 				continue
 			}
 			// todo: enable this once everything working
-			//create := onlyInFirst(e.getServices(), aws.getServices())
-			//count := aws.create(create)
-			//if count > 0 {
-			count := 0
-			aws.log.Info("created", "count", fmt.Sprintf("%d", count))
-			//}
+			create := onlyInFirst(e.getServices(), aws.getServices())
+			count := aws.create(create)
+			if count > 0 {
+				count := 0
+				aws.log.Info("\ncreated", "count", fmt.Sprintf("%d", count))
+			}
 
 			//remove := onlyInFirst(aws.getServices(), e.getServices())
 			//count = aws.remove(remove)
@@ -140,17 +140,30 @@ func (e *eureka) sync(aws *aws, stop, stopped chan struct{}) {
 
 func (e *eureka) transformNodes(cnodes []e.InstanceInfo) map[string]map[int]node {
 	nodes := map[string]map[int]node{}
+	attributes := make(map[string]string)
+
 	for _, n := range cnodes {
-		address := n.HostName
-		if len(address) == 0 {
-			address = n.IpAddr
+		privateip := n.DataCenterInfo.Metadata.LocalIpv4
+
+		if nodes[privateip] == nil {
+			nodes[privateip] = map[int]node{}
 		}
-		if nodes[address] == nil {
-			nodes[address] = map[int]node{}
-		}
-		ports := nodes[address]
-		ports[n.Port.Port] = node{port: n.Port.Port, host: address, eurekaID: n.App, awsID: n.App, attributes: n.Metadata.Map}
-		nodes[address] = ports
+
+		ports := nodes[privateip]
+
+		attributes["public-ipv4"] = n.DataCenterInfo.Metadata.PublicIpv4
+		attributes["local-ipv4"] = n.DataCenterInfo.Metadata.LocalIpv4
+		attributes["public-hostname"] = n.DataCenterInfo.Metadata.PublicHostname
+		attributes["local-hostname"] = n.DataCenterInfo.Metadata.LocalHostname
+		attributes["availability-zone"] = n.DataCenterInfo.Metadata.AvailabilityZone
+		attributes["homePageUrl"] = n.HomePageUrl
+		attributes["statusPageUrl"] = n.StatusPageUrl
+		attributes["healthCheckUrl"] = n.HealthCheckUrl
+		attributes["private-ipv4"] = n.DataCenterInfo.Metadata.LocalIpv4
+
+		ports[n.Port.Port] = node{port: n.Port.Port, host: attributes["local-hostname"], eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: n.DataCenterInfo.Metadata.InstanceId}
+		nodes[privateip] = ports
+		e.log.Debug("transformNodes", "port", n.Port.Port, "ipAddr", n.IpAddr, "attributes", attributes, "instanceId", n.DataCenterInfo.Metadata.InstanceId)
 	}
 	return nodes
 }
@@ -168,16 +181,20 @@ func (e *eureka) fetchNodes(service string) ([]e.InstanceInfo, error) {
 
 func (e *eureka) transformHealth(ehealths []e.InstanceInfo) map[string]health {
 	healths := map[string]health{}
+
 	for _, h := range ehealths {
+		instanceId := h.DataCenterInfo.Metadata.InstanceId
+		e.log.Info("transformHealth()", "instance", instanceId, "status", h.Status)
+
 		switch h.Status {
 		case "UP":
-			healths[h.InstanceID] = "HEALTHY"
+			healths[instanceId] = "HEALTHY"
 		case "DOWN":
 		case "STARTING":
 		case "OUT_OF_SERVICE":
-			healths[h.InstanceID] = "UNHEALTHY"
+			healths[instanceId] = "UNHEALTHY"
 		default:
-			healths[h.InstanceID] = "UNKNOWN"
+			healths[instanceId] = "UNKNOWN"
 		}
 	}
 	return healths
@@ -211,7 +228,7 @@ func (e *eureka) fetch() error {
 	services := e.transformServices(apps)
 
 	e.setServices(services)
-	fmt.Printf("services: %v", services)
+	//fmt.Printf("services: %v", services)
 	return nil
 }
 
@@ -220,13 +237,14 @@ func (e *eureka) transformServices(apps *e.Applications) map[string]service {
 	for _, v := range apps.Applications {
 		// bishwa
 		if v.Name == "BABAR" {
-			s := service{id: v.Name, name: v.Name, eurekaID: v.Name}
+			s := service{id: v.Name, name: v.Name, eurekaID: v.Name, fromEureka: true}
 			/*
 				if s.fromAWS {
 					s.name = strings.TrimPrefix(v.Name, e.awsPrefix)
 				}
 			*/
 
+			e.log.Info("transformServices", "instanceID", v.Instances[0].DataCenterInfo.Metadata.InstanceId)
 			s.nodes = e.transformNodes(v.Instances)
 			s.healths = e.transformHealth(v.Instances)
 

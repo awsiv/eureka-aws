@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -29,7 +30,7 @@ type namespace struct {
 
 type aws struct {
 	lock         sync.RWMutex
-	client       *sd.ServiceDiscovery
+	client       *sd.Client
 	log          hclog.Logger
 	namespace    namespace
 	services     map[string]service
@@ -51,7 +52,7 @@ func (a *aws) sync(eureka *eureka, stop, stopped chan struct{}) {
 
 func (a *aws) fetchNamespace(id string) (*sd.Namespace, error) {
 	req := a.client.GetNamespaceRequest(&sd.GetNamespaceInput{Id: x.String(id)})
-	resp, err := req.Send()
+	resp, err := req.Send(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -66,12 +67,14 @@ func (a *aws) fetchServices() ([]sd.ServiceSummary, error) {
 			Values:    []string{a.namespace.id},
 		}},
 	})
-	p := req.Paginate()
-	services := []sd.ServiceSummary{}
-	for p.Next() {
-		services = append(services, p.CurrentPage().Services...)
+
+	resp, err := req.Send(context.Background())
+	if err != nil {
+		return nil, err
 	}
-	return services, p.Err()
+	a.log.Debug("fetchServices", "resp", resp)
+	services := resp.Services
+	return services, nil
 }
 
 func (a *aws) transformServices(awsServices []sd.ServiceSummary) map[string]service {
@@ -186,11 +189,11 @@ func statusFromAWS(aws sd.HealthStatus) health {
 	var result health
 	switch aws {
 	case sd.HealthStatusHealthy:
-		result = passing
+		result = "UP"
 	case sd.HealthStatusUnhealthy:
-		result = critical
+		result = "OUT_OF_SERVICE"
 	case sd.HealthStatusUnknown:
-		result = unknown
+		result = "UNKNOWN"
 	}
 	return result
 }
@@ -198,9 +201,9 @@ func statusFromAWS(aws sd.HealthStatus) health {
 func statusToCustomHealth(h health) sd.CustomHealthStatus {
 	var result sd.CustomHealthStatus
 	switch h {
-	case passing:
+	case "UP":
 		result = sd.CustomHealthStatusHealthy
-	case critical:
+	default:
 		result = sd.CustomHealthStatusUnhealthy
 	}
 	return result
@@ -210,25 +213,19 @@ func (a *aws) fetchHealths(id string) (map[string]health, error) {
 	req := a.client.GetInstancesHealthStatusRequest(&sd.GetInstancesHealthStatusInput{
 		ServiceId: &id,
 	})
+
 	result := map[string]health{}
-	p := req.Paginate()
-	for p.Next() {
-		for id, health := range p.CurrentPage().Status {
-			result[id] = statusFromAWS(health)
-		}
-	}
-	err := p.Err()
+	resp, err := req.Send(context.Background())
+	a.log.Debug("fetchHealths", "resp", resp)
+
 	if err != nil {
-		if err, ok := err.(awserr.Error); ok {
-			switch err.Code() {
-			case sd.ErrCodeInstanceNotFound:
-			default:
-				return result, err
-			}
-		} else {
-			return result, err
-		}
+		return nil, err
 	}
+
+	for id, health := range resp.Status {
+		result[id] = statusFromAWS(health)
+	}
+
 	return result, nil
 }
 
@@ -254,12 +251,20 @@ func (a *aws) fetchNodes(id string) ([]sd.InstanceSummary, error) {
 	req := a.client.ListInstancesRequest(&sd.ListInstancesInput{
 		ServiceId: &id,
 	})
-	p := req.Paginate()
-	nodes := []sd.InstanceSummary{}
-	for p.Next() {
-		nodes = append(nodes, p.CurrentPage().Instances...)
+
+	resp, err := req.Send(context.Background())
+	a.log.Info("fetchNodes", "resp", resp)
+	if err != nil {
+		a.log.Error("fetchNodes", "resp", err)
+		return nil, err
 	}
-	return nodes, p.Err()
+
+	nodes := []sd.InstanceSummary{}
+	//nodes = append(nodes, resp.Instances)
+	/*for p.Next() {
+		nodes = append(nodes, p.CurrentPage().Instances...)
+	}*/
+	return nodes, nil //p.Err()
 }
 
 func (a *aws) discoverNodes(name string) ([]sd.InstanceSummary, error) {
@@ -268,7 +273,7 @@ func (a *aws) discoverNodes(name string) ([]sd.InstanceSummary, error) {
 		NamespaceName: x.String(a.namespace.name),
 		ServiceName:   x.String(name),
 	})
-	resp, err := req.Send()
+	resp, err := req.Send(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -303,15 +308,20 @@ func (a *aws) create(services map[string]service) int {
 	wg := sync.WaitGroup{}
 	count := 0
 	for k, s := range services {
+		a.log.Info("create", "serviceName", s.name)
 		if s.fromAWS {
 			continue
 		}
 		name := a.eurekaPrefix + k
+		a.log.Info("create", "awsServiceName", name, "namespace", a.namespace.id)
 		if len(s.awsID) == 0 {
 			input := sd.CreateServiceInput{
 				Description: &awsServiceDescription,
 				Name:        &name,
 				NamespaceId: &a.namespace.id,
+				HealthCheckCustomConfig: &sd.HealthCheckCustomConfig{
+					FailureThreshold: x.Int64(10),
+				},
 			}
 			if !a.namespace.isHTTP {
 				input.DnsConfig = &sd.DnsConfig{
@@ -321,8 +331,9 @@ func (a *aws) create(services map[string]service) int {
 					},
 				}
 			}
+
 			req := a.client.CreateServiceRequest(&input)
-			resp, err := req.Send()
+			resp, err := req.Send(context.Background())
 			if err != nil {
 				if err, ok := err.(awserr.Error); ok {
 					switch err.Code() {
@@ -335,44 +346,52 @@ func (a *aws) create(services map[string]service) int {
 				continue
 			}
 			s.awsID = *resp.Service.Id
+
+			a.log.Info("Created service:", "name", name, "ns", a.namespace.id, "desc", awsServiceDescription, "namespaceID", s.awsID)
 			count++
 		}
+		a.log.Info("create", "nodes", s.nodes)
 		for h, nodes := range s.nodes {
+			a.log.Info("create", "h", h, "nodes", nodes[0].instanceID)
 			for _, n := range nodes {
 				wg.Add(1)
 				go func(serviceID, name, h string, n node) {
 					wg.Done()
-					instanceID := id(serviceID, h, n.port)
+					instanceID := n.instanceID //id(serviceID, h, n.port)
 					attributes := n.attributes
-					attributes["AWS_INSTANCE_IPV4"] = h
+					attributes["AWS_INSTANCE_IPV4"] = n.attributes["local-ipv4"]
 					attributes["AWS_INSTANCE_PORT"] = fmt.Sprintf("%d", n.port)
+					//attributes["public-ipv4"] = n.attributes[]
+
 					req := a.client.RegisterInstanceRequest(&sd.RegisterInstanceInput{
 						ServiceId:  &serviceID,
 						Attributes: attributes,
 						InstanceId: &instanceID,
 					})
-					_, err := req.Send()
+					_, err := req.Send(context.Background())
 					if err != nil {
 						a.log.Error("cannot create nodes", "error", err.Error())
 					}
+					a.log.Info("Registering instance:", "ID", instanceID, "service", serviceID, "ip", h, "attributes", attributes)
 				}(s.awsID, name, h, n)
 			}
 		}
-		// for instanceID, h := range s.healths {
-		// 	wg.Add(1)
-		// 	go func(serviceID, instanceID string, h health) {
-		// 		defer wg.Done()
-		// 		req := a.client.UpdateInstanceCustomHealthStatusRequest(&sd.UpdateInstanceCustomHealthStatusInput{
-		// 			ServiceId:  &serviceID,
-		// 			InstanceId: &instanceID,
-		// 			Status:     statusToCustomHealth(h),
-		// 		})
-		// 		_, err := req.Send()
-		// 		if err != nil {
-		// 			a.log.Error("cannot create custom health", "error", err.Error())
-		// 		}
-		// 	}(s.awsID, instanceID, h)
-		// }
+		for instanceID, h := range s.healths {
+			a.log.Info("create()", "serviceID", s.awsID, "instanceID", instanceID, "health", statusToCustomHealth(h))
+			wg.Add(1)
+			go func(serviceID, instanceID string, h health) {
+				defer wg.Done()
+				req := a.client.UpdateInstanceCustomHealthStatusRequest(&sd.UpdateInstanceCustomHealthStatusInput{
+					ServiceId:  &serviceID,
+					InstanceId: &instanceID,
+					Status:     statusToCustomHealth(h),
+				})
+				_, err := req.Send(context.Background())
+				if err != nil {
+					a.log.Error("cannot create custom health", "error", err.Error())
+				}
+			}(s.awsID, instanceID, h)
+		}
 	}
 	wg.Wait()
 	return count
@@ -393,7 +412,7 @@ func (a *aws) remove(services map[string]service) int {
 						ServiceId:  &serviceID,
 						InstanceId: &id,
 					})
-					_, err := req.Send()
+					_, err := req.Send(context.Background())
 					if err != nil {
 						a.log.Error("cannot remove instance", "error", err.Error())
 					}
@@ -415,7 +434,7 @@ func (a *aws) remove(services map[string]service) int {
 		req := a.client.DeleteServiceRequest(&sd.DeleteServiceInput{
 			Id: &s.awsID,
 		})
-		_, err := req.Send()
+		_, err := req.Send(context.Background())
 		if err != nil {
 			a.log.Error("cannot remove services", "name", k, "id", s.awsID, "error", err.Error())
 		} else {
