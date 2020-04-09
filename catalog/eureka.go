@@ -124,14 +124,15 @@ func (e *eureka) sync(aws *aws, stop, stopped chan struct{}) {
 			count := aws.create(create)
 			if count > 0 {
 				count := 0
-				aws.log.Info("\ncreated", "count", fmt.Sprintf("%d", count))
+				e.log.Info("created", "count", fmt.Sprintf("%d", count))
 			}
 
-			//remove := onlyInFirst(aws.getServices(), e.getServices())
-			//count = aws.remove(remove)
-			//if count > 0 {
-			aws.log.Info("removed", "count", fmt.Sprintf("%d", count))
-			//}
+			remove := onlyInFirst(aws.getServices(), e.getServices())
+			//e.log.Info("sync()", "aws", aws.getServices(), "eureka", e.getServices())
+			count = aws.remove(remove)
+			if count > 0 {
+				e.log.Info("removed", "count", fmt.Sprintf("%d", count))
+			}
 		case <-stop:
 			return
 		}
@@ -161,7 +162,7 @@ func (e *eureka) transformNodes(cnodes []e.InstanceInfo) map[string]map[int]node
 		attributes["healthCheckUrl"] = n.HealthCheckUrl
 		attributes["private-ipv4"] = n.DataCenterInfo.Metadata.LocalIpv4
 
-		ports[n.Port.Port] = node{port: n.Port.Port, host: attributes["local-hostname"], eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: n.DataCenterInfo.Metadata.InstanceId}
+		ports[n.Port.Port] = node{port: n.Port.Port, host: attributes["local-ipv4"], eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: n.DataCenterInfo.Metadata.InstanceId}
 		nodes[privateip] = ports
 		e.log.Debug("transformNodes", "port", n.Port.Port, "ipAddr", n.IpAddr, "attributes", attributes, "instanceId", n.DataCenterInfo.Metadata.InstanceId)
 	}
@@ -170,9 +171,7 @@ func (e *eureka) transformNodes(cnodes []e.InstanceInfo) map[string]map[int]node
 
 // read nodes from eureka
 func (e *eureka) fetchNodes(service string) ([]e.InstanceInfo, error) {
-	//opts := &api.QueryOptions{AllowStale: e.stale}
 	app, err := e.client.GetApplication(service)
-	//.Service(service, "", opts)
 	if err != nil {
 		return nil, fmt.Errorf("error querying Service nodes, will retry: %s", err)
 	}
@@ -235,7 +234,7 @@ func (e *eureka) fetch() error {
 func (e *eureka) transformServices(apps *e.Applications) map[string]service {
 	services := make(map[string]service, len(apps.Applications))
 	for _, v := range apps.Applications {
-		// bishwa
+		//TODO: bishwa
 		if v.Name == "BABAR" {
 			s := service{id: v.Name, name: v.Name, eurekaID: v.Name, fromEureka: true}
 			/*
