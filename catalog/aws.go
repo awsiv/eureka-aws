@@ -202,6 +202,8 @@ func statusToCustomHealth(h health) sd.CustomHealthStatus {
 	var result sd.CustomHealthStatus
 	switch h {
 	case "UP":
+	case "HEALTHY":
+	case passing:
 		result = sd.CustomHealthStatusHealthy
 	default:
 		result = sd.CustomHealthStatusUnhealthy
@@ -377,7 +379,7 @@ func (a *aws) create(services map[string]service) int {
 			}
 		}
 		for instanceID, h := range s.healths {
-			a.log.Info("create()", "serviceID", s.awsID, "instanceID", instanceID, "health", statusToCustomHealth(h))
+			a.log.Info("create()", "serviceID", s.awsID, "instanceID", instanceID, "health", statusToCustomHealth(h), "status", h)
 			wg.Add(1)
 			go func(serviceID, instanceID string, h health) {
 				defer wg.Done()
