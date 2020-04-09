@@ -4,6 +4,8 @@ require (
 	github.com/ArthurHlt/go-eureka-client v1.1.0
 	github.com/aws/aws-sdk-go v1.29.19
 	github.com/aws/aws-sdk-go-v2 v0.20.0
+	github.com/gogo/protobuf v1.1.1
+	github.com/google/martian v2.1.0+incompatible
 	github.com/hashicorp/consul v1.4.0
 	github.com/hashicorp/consul-aws v0.1.1
 	github.com/hashicorp/go-hclog v0.8.0

@@ -45,9 +45,33 @@ type aws struct {
 var awsServiceDescription = "Imported from Eureka"
 
 func (a *aws) sync(eureka *eureka, stop, stopped chan struct{}) {
-	/*
-	* TODO: sync to eureka
-	 */
+	defer close(stopped)
+	for {
+		select {
+		case <-a.trigger:
+			if !a.toEureka {
+				continue
+			}
+			/*
+				// todo: enable this once everything working
+				create := onlyInFirst(a.getServices(), eureka.getServices())
+				count := eureka.create(create)
+				if count > 0 {
+					count := 0
+					e.log.Info("created", "count", fmt.Sprintf("%d", count))
+				}
+
+				remove := onlyInFirst(aws.getServices(), e.getServices())
+				//e.log.Info("sync()", "aws", aws.getServices(), "eureka", e.getServices())
+				count = aws.remove(remove)
+				if count > 0 {
+					e.log.Info("removed", "count", fmt.Sprintf("%d", count))
+				}*/
+		case <-stop:
+			a.log.Info("sync()", "stopped", 1)
+			return
+		}
+	}
 }
 
 func (a *aws) fetchNamespace(id string) (*sd.Namespace, error) {
@@ -60,7 +84,6 @@ func (a *aws) fetchNamespace(id string) (*sd.Namespace, error) {
 }
 
 func (a *aws) fetchServices() ([]sd.ServiceSummary, error) {
-	a.log.Info("fetchServices()", "Start..")
 	req := a.client.ListServicesRequest(&sd.ListServicesInput{
 		Filters: []sd.ServiceFilter{{
 			Name:      sd.ServiceFilterNameNamespaceId,
@@ -153,6 +176,7 @@ func (a *aws) fetch() error {
 		}
 
 		services[h] = s
+		a.log.Debug("fetch()", "service", s)
 	}
 	a.setServices(services)
 	return nil
@@ -276,7 +300,6 @@ func (a *aws) fetchNodes(id string) ([]sd.InstanceSummary, error) {
 }
 
 func (a *aws) discoverNodes(name string) ([]sd.InstanceSummary, error) {
-	a.log.Info("discoverNodes()", "Start...")
 	req := a.client.DiscoverInstancesRequest(&sd.DiscoverInstancesInput{
 		HealthStatus:  sd.HealthStatusFilterHealthy,
 		NamespaceName: x.String(a.namespace.name),
@@ -321,12 +344,12 @@ func (a *aws) create(services map[string]service) int {
 	wg := sync.WaitGroup{}
 	count := 0
 	for k, s := range services {
-		a.log.Info("create()", "serviceName", s.name)
+		a.log.Debug("create()", "serviceName", s.name)
 		if s.fromAWS {
 			continue
 		}
 		name := a.eurekaPrefix + k
-		a.log.Info("create()", "awsServiceName", name, "namespace", a.namespace.id)
+		a.log.Debug("create()", "awsServiceName", name, "namespace", a.namespace.id)
 		if len(s.awsID) == 0 {
 			input := sd.CreateServiceInput{
 				Description: &awsServiceDescription,
@@ -363,12 +386,11 @@ func (a *aws) create(services map[string]service) int {
 			}
 			s.awsID = *resp.Service.Id
 
-			a.log.Info("Created service:", "name", name, "ns", a.namespace.id, "desc", awsServiceDescription, "namespaceID", s.awsID)
+			a.log.Info("Created service:", "name", name, "ns", a.namespace.id, "namespaceID", s.awsID)
 			count++
 		}
 
 		for h, nodes := range s.nodes {
-			a.log.Info("create", "h", h, "nodes", nodes[0].instanceID)
 			for _, n := range nodes {
 				wg.Add(1)
 				go func(serviceID, name, h string, n node) {
@@ -386,18 +408,18 @@ func (a *aws) create(services map[string]service) int {
 					})
 					_, err := req.Send(context.Background())
 					if err != nil {
-						a.log.Error("cannot create nodes", "error", err.Error())
+						a.log.Error("cannot register node", "error", err.Error())
+					} else {
+						a.log.Info("Registered node", "ID", instanceID, "service", serviceID, "ip", h, "ns", a.namespace.id)
 					}
-					a.log.Info("Registering instance:", "ID", instanceID, "service", serviceID, "ip", h)
 				}(s.awsID, name, h, n)
 			}
 		}
 		for instanceID, h := range s.healths {
-			a.log.Info("create()", "serviceID", s.awsID, "instanceID", instanceID, "health", statusToCustomHealth(h), "status", h)
+			a.log.Debug("create()", "serviceID", s.awsID, "instanceID", instanceID, "health", statusToCustomHealth(h), "status", h)
 			wg.Add(1)
 			go func(serviceID, instanceID string, h health) {
-				//defer wg.Done()
-				wg.Done()
+				defer wg.Done()
 				req := a.client.UpdateInstanceCustomHealthStatusRequest(&sd.UpdateInstanceCustomHealthStatusInput{
 					ServiceId:  &serviceID,
 					InstanceId: &instanceID,
@@ -428,10 +450,8 @@ func (a *aws) remove(services map[string]service) int {
 			for _, n := range nodes {
 				wg.Add(1)
 				go func(serviceID, id string) {
-					a.log.Info("remove()", "instanceId", n.awsID, "health", h)
-
-					/*defer*/
-					wg.Done()
+					a.log.Info("remove()", "instanceId", n.awsID, "ipv4", h)
+					defer wg.Done()
 					req := a.client.DeregisterInstanceRequest(&sd.DeregisterInstanceInput{
 						ServiceId:  &serviceID,
 						InstanceId: &id,
@@ -472,8 +492,19 @@ func (a *aws) remove(services map[string]service) int {
 	return count
 }
 
+func IsClosed(ch <-chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+	}
+
+	return false
+}
+
 func (a *aws) fetchIndefinetely(stop, stopped chan struct{}) {
 	defer close(stopped)
+
 	for {
 		err := a.fetch()
 		if err != nil {
