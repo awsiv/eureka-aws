@@ -80,20 +80,23 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if len(c.flagAWSNamespaceID) == 0 {
-		c.UI.Error("Please provide -aws-namespace-id. ---")
+		c.UI.Error("Please provide -aws-namespace-id.")
 		return 1
 	}
 
+	//Note:
+	//		use credentials_source = EC2InstanceMetadata
+	//		https://github.com/aws/aws-sdk-go/issues/1993
 	config, err := subcommand.AWSConfig()
 	if err != nil {
-		//c.UI.Error(fmt.Sprintf("Error retrieving AWS session: %s", err))
-		// TODO: fix aws auth
-		//return 1
-		c.UI.Info("error")
+		c.UI.Error(fmt.Sprintf("Error retrieving AWS session: %s", err))
+		return 1
+	} else {
+		c.UI.Info(fmt.Sprintf("Retrieved AWS session: %v", config.Region))
 	}
 	awsClient := sd.New(config)
 
-	c.UI.Error(fmt.Sprintf("Moving on.."))
+	//return 1
 	eurekaClient := e.NewClient([]string{
 		"http://ec2-52-70-156-143.compute-1.amazonaws.com:8080/eureka/v2",
 	})

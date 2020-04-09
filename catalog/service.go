@@ -31,6 +31,7 @@ type node struct {
 	host       string
 	awsID      string
 	eurekaID   string
+	instanceID string
 	attributes map[string]string
 }
 

@@ -6,5 +6,9 @@ import (
 )
 
 func AWSConfig() (aws.Config, error) {
-	return external.LoadDefaultAWSConfig()
+	// TODO: read from ENV
+	return external.LoadDefaultAWSConfig(
+		external.WithSharedConfigProfile("tidal-stage"),
+		external.WithRegion("us-east-1"),
+	)
 }
