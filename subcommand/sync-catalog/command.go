@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"sync"
 
-	e "github.com/ArthurHlt/go-eureka-client/eureka"
+	_e "github.com/ArthurHlt/go-eureka-client/eureka"
 	sd "github.com/aws/aws-sdk-go-v2/service/servicediscovery"
 	"github.com/awsiv/eureka-aws/catalog"
 	"github.com/awsiv/eureka-aws/subcommand"
@@ -91,7 +91,7 @@ func (c *Command) Run(args []string) int {
 	awsClient := sd.New(config)
 
 	//return 1
-	eurekaClient := e.NewClient([]string{
+	eurekaClient := _e.NewClient([]string{
 		"http://ec2-52-70-156-143.compute-1.amazonaws.com:8080/eureka/v2",
 	})
 	if eurekaClient == nil {

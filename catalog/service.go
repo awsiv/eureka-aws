@@ -16,6 +16,27 @@ const (
 	unknown        health = ""
 )
 
+/*
+type service struct {
+	id           string
+	name         string
+	nodes        map[string]map[int]node
+	healths      map[string]health
+	fromConsul   bool
+	fromAWS      bool
+	awsID        string
+	consulID     string
+	awsNamespace string
+}
+
+type node struct {
+	port       int
+	host       string
+	awsID      string
+	consulID   string
+	attributes map[string]string
+}
+*/
 type service struct {
 	id           string
 	name         string

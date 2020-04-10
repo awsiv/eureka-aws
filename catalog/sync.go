@@ -3,14 +3,14 @@ package catalog
 import (
 	"time"
 
-	e "github.com/ArthurHlt/go-eureka-client/eureka"
+	_e "github.com/ArthurHlt/go-eureka-client/eureka"
 	sd "github.com/aws/aws-sdk-go-v2/service/servicediscovery"
 	"github.com/hashicorp/go-hclog"
 )
 
 // Sync aws->eureka and vice versa.
 
-func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInterval string, awsDNSTTL int64, stale bool, awsClient *sd.Client, eurekaClient *e.Client, stop, stopped chan struct{}) {
+func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInterval string, awsDNSTTL int64, stale bool, awsClient *sd.Client, eurekaClient *_e.Client, stop, stopped chan struct{}) {
 	defer close(stopped)
 	log := hclog.Default().Named("sync")
 
