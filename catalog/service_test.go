@@ -151,32 +151,32 @@ func TestOnlyInFirst(t *testing.T) {
 		},
 		{
 			a: map[string]service{
-				"s16": {healths: map[string]health{"h1": passing, "h2": critical}},
+				"s16": {healths: map[string]health{"h1": up, "h2": unhealthy}},
 			},
 			b: map[string]service{
-				"s16": {healths: map[string]health{"h1": passing}},
+				"s16": {healths: map[string]health{"h1": up}},
 			},
 			expected: map[string]service{
-				"s16": {healths: map[string]health{"h2": critical}},
+				"s16": {healths: map[string]health{"h2": unhealthy}},
 			},
 		},
 		{
 			a: map[string]service{
-				"s17": {healths: map[string]health{"h1": passing}},
+				"s17": {healths: map[string]health{"h1": up}},
 			},
 			b: map[string]service{
-				"s17": {healths: map[string]health{"h1": critical}},
+				"s17": {healths: map[string]health{"h1": unhealthy}},
 			},
 			expected: map[string]service{
-				"s17": {healths: map[string]health{"h1": passing}},
+				"s17": {healths: map[string]health{"h1": up}},
 			},
 		},
 		{
 			a: map[string]service{
-				"s18": {healths: map[string]health{"h1": passing, "h2": critical}},
+				"s18": {healths: map[string]health{"h1": up, "h2": unhealthy}},
 			},
 			b: map[string]service{
-				"s18": {healths: map[string]health{"h2": critical, "h1": passing}},
+				"s18": {healths: map[string]health{"h2": unhealthy, "h1": up}},
 			},
 			expected: map[string]service{},
 		},

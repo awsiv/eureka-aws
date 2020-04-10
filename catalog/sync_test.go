@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -74,7 +75,7 @@ func runSyncTest(t *testing.T, namespaceID string) {
 		}
 	}()
 	go func() {
-		if err := checkForImportedConsulService(a, namespaceID, "consul_"+cName, 100); err != nil {
+		if err := checkForImportedEurekaService(a, namespaceID, "eureka_"+cName, 100); err != nil {
 			t.Error(err)
 		} else {
 			close(doneC)
@@ -112,7 +113,7 @@ func runSyncTest(t *testing.T, namespaceID string) {
 	if err = checkForImportedAWSService(c, "aws_"+aName, namespaceID, aID, 1); err == nil {
 		t.Error("Expected that the imported aws services is deleted")
 	}
-	if err = checkForImportedConsulService(a, namespaceID, "consul_"+cName, 1); err == nil {
+	if err = checkForImportedEurekaService(a, namespaceID, "eureka_"+cName, 1); err == nil {
 		t.Error("Expected that the imported consul services is deleted")
 	}
 
@@ -121,7 +122,7 @@ func runSyncTest(t *testing.T, namespaceID string) {
 }
 func createServiceInConsul(c *api.Client, id, name string) error {
 	reg := api.CatalogRegistration{
-		Node:           ConsulAWSNodeName,
+		Node:           EurekaAWSNodeName,
 		Address:        "127.0.0.1",
 		SkipNodeUpdate: true,
 		Service: &api.AgentService{
@@ -139,7 +140,7 @@ func createServiceInConsul(c *api.Client, id, name string) error {
 }
 
 func deleteServiceInConsul(c *api.Client, id string) {
-	c.Catalog().Deregister(&api.CatalogDeregistration{Node: ConsulAWSNodeName, ServiceID: id}, nil)
+	c.Catalog().Deregister(&api.CatalogDeregistration{Node: EurekaAWSNodeName, ServiceID: id}, nil)
 }
 
 func createServiceInAWS(a *sd.Client, namespaceID, name string) (string, error) {
@@ -149,14 +150,13 @@ func createServiceInAWS(a *sd.Client, namespaceID, name string) (string, error) 
 		NamespaceId: &namespaceID,
 		DnsConfig: &sd.DnsConfig{
 			DnsRecords: []sd.DnsRecord{
-				{TTL: &ttl, Type: sd.RecordTypeA},
 				{TTL: &ttl, Type: sd.RecordTypeSrv},
 			},
 			RoutingPolicy: sd.RoutingPolicyMultivalue,
 		},
 	}
 	req := a.CreateServiceRequest(&input)
-	resp, err := req.Send()
+	resp, err := req.Send(context.Background())
 	if err != nil {
 		return "", err
 	}
@@ -173,13 +173,13 @@ func createInstanceInAWS(a *sd.Client, serviceID string) error {
 			"FUBAR":             "BARFU",
 		},
 	})
-	_, err := req.Send()
+	_, err := req.Send(context.Background())
 	return err
 }
 
 func deleteInstanceInAWS(a *sd.Client, id string) error {
 	req := a.DeregisterInstanceRequest(&sd.DeregisterInstanceInput{ServiceId: &id, InstanceId: &id})
-	_, err := req.Send()
+	_, err := req.Send(context.Background())
 	return err
 }
 
@@ -187,7 +187,7 @@ func deleteServiceInAWS(a *sd.Client, id string) error {
 	var err error
 	for i := 0; i < 50; i++ {
 		req := a.DeleteServiceRequest(&sd.DeleteServiceInput{Id: &id})
-		_, err = req.Send()
+		_, err = req.Send(context.Background())
 		if err != nil {
 			time.Sleep(100 * time.Millisecond)
 		} else {
@@ -204,14 +204,14 @@ func checkForImportedAWSService(c *api.Client, name, namespaceID, serviceID stri
 			if tags, ok := services[name]; ok {
 				found := false
 				for _, t := range tags {
-					if t == ConsulAWSTag {
+					if t == EurekaAWSTag {
 						found = true
 					}
 				}
 				if !found {
 					return fmt.Errorf("aws tag is missing on consul service")
 				}
-				cservices, _, err := c.Catalog().Service(name, ConsulAWSTag, nil)
+				cservices, _, err := c.Catalog().Service(name, EurekaAWSTag, nil)
 				if err != nil {
 					return err
 				}
@@ -222,14 +222,14 @@ func checkForImportedAWSService(c *api.Client, name, namespaceID, serviceID stri
 				if m["FUBAR"] != "BARFU" {
 					return fmt.Errorf("custom meta doesn't match: %s", m["FUBAR"])
 				}
-				if m[ConsulSourceKey] != ConsulAWSTag {
-					return fmt.Errorf("%s meta doesn't match: %s", ConsulSourceKey, m[ConsulSourceKey])
+				if m[EurekaSourceKey] != EurekaAWSTag {
+					return fmt.Errorf("%s meta doesn't match: %s", EurekaSourceKey, m[EurekaSourceKey])
 				}
-				if m[ConsulAWSNS] != namespaceID {
-					return fmt.Errorf("%s meta doesn't match: expected: %s actual: %s", ConsulAWSNS, namespaceID, m[ConsulAWSNS])
+				if m[EurekaAWSNS] != namespaceID {
+					return fmt.Errorf("%s meta doesn't match: expected: %s actual: %s", EurekaAWSNS, namespaceID, m[EurekaAWSNS])
 				}
-				if m[ConsulAWSID] != serviceID {
-					return fmt.Errorf("%s meta doesn't match: expected: %s, actual: %s", ConsulAWSID, serviceID, m[ConsulAWSID])
+				if m[EurekaAWSID] != serviceID {
+					return fmt.Errorf("%s meta doesn't match: expected: %s, actual: %s", EurekaAWSID, serviceID, m[EurekaAWSID])
 				}
 				return nil
 			}
@@ -239,7 +239,7 @@ func checkForImportedAWSService(c *api.Client, name, namespaceID, serviceID stri
 	return fmt.Errorf("shrug")
 }
 
-func checkForImportedConsulService(a *sd.Client, namespaceID, name string, repeat int) error {
+func checkForImportedEurekaService(a *sd.Client, namespaceID, name string, repeat int) error {
 	for i := 0; i < repeat; i++ {
 		req := a.ListServicesRequest(&sd.ListServicesInput{
 			Filters: []sd.ServiceFilter{{
@@ -248,47 +248,53 @@ func checkForImportedConsulService(a *sd.Client, namespaceID, name string, repea
 				Values:    []string{namespaceID},
 			}},
 		})
-		p := req.Paginate()
-		for p.Next() {
-			for _, s := range p.CurrentPage().Services {
-				if *s.Name == name {
-					if !(s.Description != nil || *s.Description == awsServiceDescription) {
-						return fmt.Errorf("consul description is missing on aws service")
-					}
-					var instance *sd.InstanceSummary
-					for i := 0; i < 20; i++ {
-						ireq := a.ListInstancesRequest(&sd.ListInstancesInput{
-							ServiceId: s.Id,
-						})
-						out, err := ireq.Send()
-						if err != nil {
-							continue
-						}
-						if len(out.Instances) != 1 {
-							time.Sleep(200 * time.Millisecond)
-							continue
-						}
-						instance = &out.Instances[0]
-					}
-					if instance == nil {
-						return fmt.Errorf("couldn't get instance")
-					}
-					m := instance.Attributes
 
-					if m["AWS_INSTANCE_IPV4"] != "127.0.0.1" {
-						return fmt.Errorf("AWS_INSTANCE_IPV4 not correct")
-					}
-					if m["AWS_INSTANCE_PORT"] != "6379" {
-						return fmt.Errorf("AWS_INSTANCE_PORT not correct")
-					}
-					if m["BARFU"] != "FUBAR" {
-						return fmt.Errorf("custom meta not correct")
-					}
-					return nil
-				}
-			}
+		resp, err := req.Send(context.Background())
+		if err != nil {
+			return err
 		}
-		time.Sleep(100 * time.Millisecond)
+
+		services := resp.Services
+
+		for _, s := range services {
+			if *s.Name == name {
+				if !(s.Description != nil || *s.Description == awsServiceDescription) {
+					return fmt.Errorf("consul description is missing on aws service")
+				}
+				var instance *sd.InstanceSummary
+				for i := 0; i < 20; i++ {
+					ireq := a.ListInstancesRequest(&sd.ListInstancesInput{
+						ServiceId: s.Id,
+					})
+					out, err := ireq.Send(context.Background())
+					if err != nil {
+						continue
+					}
+					if len(out.Instances) != 1 {
+						time.Sleep(200 * time.Millisecond)
+						continue
+					}
+					instance = &out.Instances[0]
+				}
+				if instance == nil {
+					return fmt.Errorf("couldn't get instance")
+				}
+				m := instance.Attributes
+
+				if m["AWS_INSTANCE_IPV4"] != "127.0.0.1" {
+					return fmt.Errorf("AWS_INSTANCE_IPV4 not correct")
+				}
+				if m["AWS_INSTANCE_PORT"] != "6379" {
+					return fmt.Errorf("AWS_INSTANCE_PORT not correct")
+				}
+				if m["BARFU"] != "FUBAR" {
+					return fmt.Errorf("custom meta not correct")
+				}
+				return nil
+			}
+
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 	return fmt.Errorf("shrug")
 }

@@ -5,7 +5,7 @@ require (
 	github.com/aws/aws-sdk-go v1.30.7 // indirect
 	github.com/aws/aws-sdk-go-v2 v0.20.0
 	github.com/gogo/protobuf v1.3.1 // indirect
-	github.com/google/martian v2.1.0+incompatible // indirect
+	github.com/google/martian v2.1.0+incompatible
 	github.com/hashicorp/consul v1.4.0
 	github.com/hashicorp/go-hclog v0.12.2
 	github.com/hashicorp/go-version v1.2.0 // indirect

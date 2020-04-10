@@ -13,6 +13,11 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+const (
+	EurekaAWSNodeName = "eureka-aws"
+	WaitTime          = 10
+)
+
 // instance info:
 //  https://github.com/ArthurHlt/go-eureka-client/blob/3b8dfe04ec6ca280d50f96356f765edb845a00e4/eureka/requests.go#L45-L67
 type eureka struct {
@@ -158,7 +163,6 @@ func (e *eureka) transformNodes(cnodes []e.InstanceInfo) map[string]map[int]node
 		attributes["homePageUrl"] = n.HomePageUrl
 		attributes["statusPageUrl"] = n.StatusPageUrl
 		attributes["healthCheckUrl"] = n.HealthCheckUrl
-		attributes["private-ipv4"] = n.DataCenterInfo.Metadata.LocalIpv4
 
 		ports[n.Port.Port] = node{port: n.Port.Port, host: attributes["local-ipv4"], eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: n.DataCenterInfo.Metadata.InstanceId}
 		nodes[privateip] = ports
@@ -233,17 +237,19 @@ func (e *eureka) transformServices(apps *e.Applications) map[string]service {
 	services := make(map[string]service, len(apps.Applications))
 	for _, v := range apps.Applications {
 		//TODO: bishwa
-		if v.Name == "CORNELIUS" {
-			s := service{id: v.Name, name: v.Name, eurekaID: v.Name, fromEureka: true}
+		if v.Name == "CORNELIUS" || v.Name == "s1" || v.Name == "s2" || v.Name == "s3" {
+			//s := service{id: v.Name, name: v.Name, eurekaID: v.Name, fromEureka: true}
+			s := service{id: "test", name: "v.Name", eurekaID: "v.Name", fromEureka: true}
+
 			/*
 				if s.fromAWS {
 					s.name = strings.TrimPrefix(v.Name, e.awsPrefix)
 				}
 			*/
 
-			e.log.Info("transformServices()", "serviceName", v.Name)
-			s.nodes = e.transformNodes(v.Instances)
-			s.healths = e.transformHealth(v.Instances)
+			//e.log.Info("transformServices()", "serviceName", v.Name)
+			//s.nodes = e.transformNodes(v.Instances)
+			//s.healths = e.transformHealth(v.Instances)
 
 			services[s.name] = s
 		}
