@@ -116,6 +116,7 @@ func TestEurekaTransformServices(t *testing.T) {
 			},
 		},
 	}
+	//services := map[string][]string{"s1": {"abc"}, "aws_s2": {EurekaAWSTag}}
 
 	attributes_s1 := map[string]string{
 		"local-ipv4":        "1.1.1.1",
@@ -143,7 +144,7 @@ func TestEurekaTransformServices(t *testing.T) {
 	}
 
 	nodes_s2 := map[string]map[int]node{
-		// structure =  ip : {port:{ ... }}
+		// structure = ip : {port:{ ... }}
 		"1.1.1.2": {2: {port: 2, host: "1.1.1.2", awsID: "s2", eurekaID: "s2", instanceID: "i-nstanceIDs2", attributes: attributes_s2}},
 		//		"1.1.1.3": {3: {port: 3, host: "1.1.1.3", eurekaID: "s2", instanceID: "i-nstanceIDs2", attributes: attributes_s2}},
 	}

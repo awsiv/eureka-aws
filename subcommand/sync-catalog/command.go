@@ -3,8 +3,13 @@ package synccatalog
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/debug"
+	_pprof "runtime/pprof"
+	"strconv"
 	"sync"
 
 	_e "github.com/ArthurHlt/go-eureka-client/eureka"
@@ -64,6 +69,17 @@ func (c *Command) init() {
 	c.help = flags.Usage(help, c.flags)
 }
 
+func countGoRoutines(w http.ResponseWriter, r *http.Request) {
+	b := []byte(strconv.Itoa(runtime.NumGoroutine()))
+	w.Write(b)
+}
+
+func getStackTraceHandler() {
+	stack := debug.Stack()
+	os.Stdout.Write(stack)
+	_pprof.Lookup("goroutine").WriteTo(os.Stdout, 2)
+}
+
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
 	if err := c.flags.Parse(args); err != nil {
@@ -104,13 +120,14 @@ func (c *Command) Run(args []string) int {
 	go catalog.Sync(
 		c.flagToAWS, c.flagToEureka, c.flagAWSNamespaceID,
 		c.flagEurekaServicePrefix, c.flagAWSServicePrefix,
-		"60s", c.flagAWSDNSTTL, c.getStaleWithDefaultTrue(),
+		c.flagAWSPollInterval, c.flagAWSDNSTTL, c.getStaleWithDefaultTrue(),
 		awsClient, eurekaClient,
 		stop, stopped,
 	)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
+
 	select {
 	// Unexpected failure
 	case <-stopped:
@@ -120,6 +137,7 @@ func (c *Command) Run(args []string) int {
 		close(stop)
 		<-stopped
 	}
+
 	return 0
 }
 
