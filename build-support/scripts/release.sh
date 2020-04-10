@@ -19,7 +19,7 @@ Usage: ${SCRIPT_NAME}  [<options ...>]
 Description:
 
    This script will do a full release build of ${PROJECT}. Building each component
-   is done within a docker container. In addition to building Consul this
+   is done within a docker container. In addition to building Eureka this
    script will do a few more things.
 
       * Update version/version*.go files

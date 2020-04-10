@@ -102,7 +102,7 @@ function have_gpg_key {
 
 function parse_version {
    # Arguments:
-   #   $1 - Path to the top level Consul source
+   #   $1 - Path to the top level Eureka source
    #   $2 - boolean value for whether the release version should be parsed from the source
    #   $3 - boolean whether to use GIT_DESCRIBE and GIT_COMMIT environment variables
    #   $4 - boolean whether to omit the version part of the version string. (optional)
@@ -212,7 +212,7 @@ function parse_version {
 
 function get_version {
    # Arguments:
-   #   $1 - Path to the top level Consul source
+   #   $1 - Path to the top level Eureka source
    #   $2 - Whether the release version should be parsed from source (optional)
    #   $3 - Whether to use GIT_DESCRIBE and GIT_COMMIT environment variables
    #
@@ -374,7 +374,7 @@ function normalize_git_url {
 
 function git_remote_url {
    # Arguments:
-   #   $1 - Path to the top level Consul source
+   #   $1 - Path to the top level Eureka source
    #   $2 - Remote name
    #
    # Returns:
@@ -413,7 +413,7 @@ function git_remote_url {
 
 function find_git_remote {
    # Arguments:
-   #   $1 - Path to the top level Consul source
+   #   $1 - Path to the top level Eureka source
    #
    # Returns:
    #   0 - success
@@ -521,7 +521,7 @@ function update_git_env {
 
 function git_push_ref {
    # Arguments:
-   #   $1 - Path to the top level Consul source
+   #   $1 - Path to the top level Eureka source
    #   $2 - Git ref (optional)
    #   $3 - remote (optional - if not specified we will try to determine it)
    #
@@ -640,7 +640,7 @@ function update_version {
 
 function set_changelog_version {
    # Arguments:
-   #   $1 - Path to top level Consul source
+   #   $1 - Path to top level Eureka source
    #   $2 - Version to put into the Changelog
    #   $3 - Release Date
    #
@@ -675,7 +675,7 @@ function set_changelog_version {
 
 function unset_changelog_version {
    # Arguments:
-   #   $1 - Path to top level Consul source
+   #   $1 - Path to top level Eureka source
    #
    # Returns:
    #   0 - success
@@ -695,7 +695,7 @@ function unset_changelog_version {
 
 function add_unreleased_to_changelog {
    # Arguments:
-   #   $1 - Path to top level Consul source
+   #   $1 - Path to top level Eureka source
    #
    # Returns:
    #   0 - success
@@ -728,7 +728,7 @@ function add_unreleased_to_changelog {
 
 function set_release_mode {
    # Arguments:
-   #   $1 - Path to top level Consul source
+   #   $1 - Path to top level Eureka source
    #   $2 - The version of the release
    #   $3 - The release date
    #   $4 - The pre-release version
@@ -780,7 +780,7 @@ function set_release_mode {
 
 function set_dev_mode {
    # Arguments:
-   #   $1 - Path to top level Consul source
+   #   $1 - Path to top level Eureka source
    #
    # Returns:
    #   0 - success
@@ -837,7 +837,7 @@ function git_staging_empty {
 
 function commit_dev_mode {
    # Arguments:
-   #   $1 - Path to top level Consul source
+   #   $1 - Path to top level Eureka source
    #
    # Returns:
    #   0 - success

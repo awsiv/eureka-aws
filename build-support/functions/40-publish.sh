@@ -181,7 +181,7 @@ function confirm_consul_version {
             break
             ;;
          * )
-            read -p "Is this Consul version correct? [y/n]: " answer
+            read -p "Is this Eureka version correct? [y/n]: " answer
             ;;
       esac
    done
@@ -193,7 +193,7 @@ function extract_consul {
 
 function verify_release_build {
    # Arguments:
-   #   $1 - Path to top level Consul source
+   #   $1 - Path to top level Eureka source
    #   $2 - expected version (optional - will parse if empty)
    #
    # Returns:
@@ -223,18 +223,18 @@ function verify_release_build {
    status_stage "==> Verifying release files"
    check_release "${sdir}/pkg/dist" "${vers}" true || return 1
 
-   status_stage "==> Extracting Consul version for local system"
+   status_stage "==> Extracting Eureka version for local system"
    local consul_exe=$(extract_consul "${sdir}/pkg/dist" "${vers}") || return 1
    # make sure to remove the temp file
    trap "rm '${consul_exe}'" EXIT
 
-   status_stage "==> Confirming Consul Version"
+   status_stage "==> Confirming Eureka Version"
    confirm_consul_version "${consul_exe}" || return 1
 }
 
 function publish_release {
    # Arguments:
-   #   $1 - Path to top level Consul source that contains the built release
+   #   $1 - Path to top level Eureka source that contains the built release
    #   $2 - boolean whether to publish to git upstream
    #   $3 - boolean whether to publish to releases.hashicorp.com
    #
