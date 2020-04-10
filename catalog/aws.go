@@ -347,12 +347,9 @@ func (a *aws) create(services map[string]service) int {
 				Description: &awsServiceDescription,
 				Name:        &name,
 				NamespaceId: &a.namespace.id,
-				/*
-					Probably do not want to configure health check as we will be updating it according to the status in eureka
-					HealthCheckCustomConfig: &sd.HealthCheckCustomConfig{
-						FailureThreshold: x.Int64(10),
-					},
-				*/
+				HealthCheckCustomConfig: &sd.HealthCheckCustomConfig{
+					FailureThreshold: x.Int64(10),
+				},
 			}
 			if !a.namespace.isHTTP {
 				input.DnsConfig = &sd.DnsConfig{
