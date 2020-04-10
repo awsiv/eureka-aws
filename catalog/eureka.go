@@ -233,7 +233,7 @@ func (e *eureka) transformServices(apps *e.Applications) map[string]service {
 	services := make(map[string]service, len(apps.Applications))
 	for _, v := range apps.Applications {
 		//TODO: bishwa
-		if v.Name == "BABAR" {
+		if v.Name == "CORNELIUS" {
 			s := service{id: v.Name, name: v.Name, eurekaID: v.Name, fromEureka: true}
 			/*
 				if s.fromAWS {
