@@ -147,26 +147,28 @@ func (e *eureka) transformNodes(cnodes []e.InstanceInfo) map[string]map[int]node
 	attributes := make(map[string]string)
 
 	for _, n := range cnodes {
-		privateip := n.DataCenterInfo.Metadata.LocalIpv4
+		/*
+			privateip := n.DataCenterInfo.Metadata.LocalIpv4
 
-		if nodes[privateip] == nil {
-			nodes[privateip] = map[int]node{}
-		}
+			if nodes[privateip] == nil {
+				nodes[privateip] = map[int]node{}
+			}
 
-		ports := nodes[privateip]
+			ports := nodes[privateip]
 
-		attributes["public-ipv4"] = n.DataCenterInfo.Metadata.PublicIpv4
-		attributes["local-ipv4"] = n.DataCenterInfo.Metadata.LocalIpv4
-		attributes["public-hostname"] = n.DataCenterInfo.Metadata.PublicHostname
-		attributes["local-hostname"] = n.DataCenterInfo.Metadata.LocalHostname
-		attributes["availability-zone"] = n.DataCenterInfo.Metadata.AvailabilityZone
-		attributes["homePageUrl"] = n.HomePageUrl
-		attributes["statusPageUrl"] = n.StatusPageUrl
-		attributes["healthCheckUrl"] = n.HealthCheckUrl
+			attributes["public-ipv4"] = n.DataCenterInfo.Metadata.PublicIpv4
+			attributes["local-ipv4"] = n.DataCenterInfo.Metadata.LocalIpv4
+			attributes["public-hostname"] = n.DataCenterInfo.Metadata.PublicHostname
+			attributes["local-hostname"] = n.DataCenterInfo.Metadata.LocalHostname
+			attributes["availability-zone"] = n.DataCenterInfo.Metadata.AvailabilityZone
+			attributes["homePageUrl"] = n.HomePageUrl
+			attributes["statusPageUrl"] = n.StatusPageUrl
+			attributes["healthCheckUrl"] = n.HealthCheckUrl
 
-		ports[n.Port.Port] = node{port: n.Port.Port, host: attributes["local-ipv4"], eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: n.DataCenterInfo.Metadata.InstanceId}
-		nodes[privateip] = ports
-		e.log.Debug("transformNodes()", "port", n.Port.Port, "ipAddr", n.IpAddr, "attributes", attributes, "instanceId", n.DataCenterInfo.Metadata.InstanceId)
+			ports[n.Port.Port] = node{port: n.Port.Port, host: attributes["local-ipv4"], eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: n.DataCenterInfo.Metadata.InstanceId}
+			nodes[privateip] = ports
+			e.log.Debug("transformNodes()", "port", n.Port.Port, "ipAddr", n.IpAddr, "attributes", attributes, "instanceId", n.DataCenterInfo.Metadata.InstanceId)
+		*/
 	}
 	return nodes
 }
