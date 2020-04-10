@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
+	_e "github.com/ArthurHlt/go-eureka-client/eureka"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 	sd "github.com/aws/aws-sdk-go-v2/service/servicediscovery"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/flags"
 )
 
 func TestSync(t *testing.T) {
@@ -31,8 +30,10 @@ func runSyncTest(t *testing.T, namespaceID string) {
 	}
 	a := sd.New(config)
 
-	f := flags.HTTPFlags{}
-	c, err := f.APIClient()
+	//f := flags.HTTPFlags{}
+	c := _e.NewClient([]string{
+		"http://127.0.0.1:8500/eureka",
+	})
 	if err != nil {
 		t.Fatalf("Error connecting to Eureka agent: %s", err)
 	}
@@ -41,20 +42,24 @@ func runSyncTest(t *testing.T, namespaceID string) {
 	cName := "redis"
 	aName := "web"
 
-	err = createServiceInConsul(c, cID, cName)
+	err = createServiceInEureka(c, cID, cName)
 	if err != nil {
 		t.Fatalf("error creating service in Eureka: %s", err)
+	} else {
+		t.Errorf("done!!!")
 	}
 
-	aID, err := createServiceInAWS(a, namespaceID, aName)
-	if err != nil {
-		t.Fatalf("error creating service %s in aws: %s", aName, err)
-	}
-	err = createInstanceInAWS(a, aID)
-	if err != nil {
-		t.Fatalf("error creating instance in aws: %s", err)
-	}
-
+	aID := "test"
+	/*
+		aID, err := createServiceInAWS(a, namespaceID, aName)
+		if err != nil {
+			t.Fatalf("error creating service %s in aws: %s", aName, err)
+		}
+		err = createInstanceInAWS(a, aID)
+		if err != nil {
+			t.Fatalf("error creating instance in aws: %s", err)
+		}
+	*/
 	stop := make(chan struct{})
 	stopped := make(chan struct{})
 	go Sync(
@@ -105,7 +110,7 @@ func runSyncTest(t *testing.T, namespaceID string) {
 	if err != nil {
 		t.Logf("error deleting service: %s", err)
 	}
-	deleteServiceInConsul(c, cID)
+	deleteServiceInConsul(c, cName, cID)
 
 	select {
 	case <-time.After((WaitTime * 3) * time.Second):
@@ -120,27 +125,27 @@ func runSyncTest(t *testing.T, namespaceID string) {
 	close(stop)
 	<-stopped
 }
-func createServiceInConsul(c *api.Client, id, name string) error {
-	reg := api.CatalogRegistration{
-		Node:           EurekaAWSNodeName,
-		Address:        "127.0.0.1",
-		SkipNodeUpdate: true,
-		Service: &api.AgentService{
-			ID:      id,
-			Service: name,
-			Address: "127.0.0.1",
-			Port:    6379,
-			Meta: map[string]string{
-				"BARFU": "FUBAR",
-			},
-		},
+func createServiceInEureka(c *_e.Client, id, name string) error {
+
+	instance := _e.NewInstanceInfo("test.com", "EUREKA", "69.172.200.235", 80, 30, false) //Create a new instance to register
+	instance.Metadata = &_e.MetaData{
+		Map: make(map[string]string),
 	}
-	_, err := c.Catalog().Register(&reg, nil)
+	dataCenterInfo := &_e.DataCenterInfo{
+		Name:     "Amazon",
+		Class:    "com.netflix.appinfo.AmazonInfo",
+		Metadata: nil,
+	}
+
+	instance.DataCenterInfo = dataCenterInfo
+	instance.Metadata.Map["foo"] = "bar"          //add metadata for example
+	err := c.RegisterInstance("EUREKA", instance) // Register new instance in your eureka(s)
+
 	return err
 }
 
-func deleteServiceInConsul(c *api.Client, id string) {
-	c.Catalog().Deregister(&api.CatalogDeregistration{Node: EurekaAWSNodeName, ServiceID: id}, nil)
+func deleteServiceInConsul(c *_e.Client, appId, instanceId string) {
+	c.UnregisterInstance(appId, instanceId)
 }
 
 func createServiceInAWS(a *sd.Client, namespaceID, name string) (string, error) {
@@ -197,43 +202,44 @@ func deleteServiceInAWS(a *sd.Client, id string) error {
 	return err
 }
 
-func checkForImportedAWSService(c *api.Client, name, namespaceID, serviceID string, repeat int) error {
+func checkForImportedAWSService(c *_e.Client, name, namespaceID, serviceID string, repeat int) error {
 	for i := 0; i < repeat; i++ {
-		services, _, err := c.Catalog().Services(nil)
-		if err == nil {
-			if tags, ok := services[name]; ok {
-				found := false
-				for _, t := range tags {
-					if t == EurekaAWSTag {
-						found = true
+		/*
+			services, _, err := c.Catalog().Services(nil)
+			if err == nil {
+				if tags, ok := services[name]; ok {
+					found := false
+					for _, t := range tags {
+						if t == EurekaAWSTag {
+							found = true
+						}
 					}
+					if !found {
+						return fmt.Errorf("aws tag is missing on consul service")
+					}
+					cservices, _, err := c.Catalog().Service(name, EurekaAWSTag, nil)
+					if err != nil {
+						return err
+					}
+					if len(cservices) != 1 {
+						return fmt.Errorf("not 1 services")
+					}
+					m := cservices[0].ServiceMeta
+					if m["FUBAR"] != "BARFU" {
+						return fmt.Errorf("custom meta doesn't match: %s", m["FUBAR"])
+					}
+					if m[EurekaSourceKey] != EurekaAWSTag {
+						return fmt.Errorf("%s meta doesn't match: %s", EurekaSourceKey, m[EurekaSourceKey])
+					}
+					if m[EurekaAWSNS] != namespaceID {
+						return fmt.Errorf("%s meta doesn't match: expected: %s actual: %s", EurekaAWSNS, namespaceID, m[EurekaAWSNS])
+					}
+					if m[EurekaAWSID] != serviceID {
+						return fmt.Errorf("%s meta doesn't match: expected: %s, actual: %s", EurekaAWSID, serviceID, m[EurekaAWSID])
+					}
+					return nil
 				}
-				if !found {
-					return fmt.Errorf("aws tag is missing on consul service")
-				}
-				cservices, _, err := c.Catalog().Service(name, EurekaAWSTag, nil)
-				if err != nil {
-					return err
-				}
-				if len(cservices) != 1 {
-					return fmt.Errorf("not 1 services")
-				}
-				m := cservices[0].ServiceMeta
-				if m["FUBAR"] != "BARFU" {
-					return fmt.Errorf("custom meta doesn't match: %s", m["FUBAR"])
-				}
-				if m[EurekaSourceKey] != EurekaAWSTag {
-					return fmt.Errorf("%s meta doesn't match: %s", EurekaSourceKey, m[EurekaSourceKey])
-				}
-				if m[EurekaAWSNS] != namespaceID {
-					return fmt.Errorf("%s meta doesn't match: expected: %s actual: %s", EurekaAWSNS, namespaceID, m[EurekaAWSNS])
-				}
-				if m[EurekaAWSID] != serviceID {
-					return fmt.Errorf("%s meta doesn't match: expected: %s, actual: %s", EurekaAWSID, serviceID, m[EurekaAWSID])
-				}
-				return nil
-			}
-		}
+			}*/
 		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("shrug")
