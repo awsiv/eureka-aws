@@ -57,8 +57,8 @@ github.com/gopherjs/gopherjs v0.0.0-20180825215210-0210a2f0f73c/go.mod h1:wJfORR
 github.com/gucumber/gucumber v0.0.0-20180127021336-7d5c79e832a2/go.mod h1:YbdHRK9ViqwGMS0rtRY+1I6faHvVyyurKPIPwifihxI=
 github.com/hashicorp/consul v1.4.0 h1:PQTW4xCuAExEiSbhrsFsikzbW5gVBoi74BjUvYFyKHw=
 github.com/hashicorp/consul v1.4.0/go.mod h1:mFrjN1mfidgJfYP1xrJCF+AfRhr6Eaqhb2+sfyn/OOI=
-github.com/hashicorp/consul-aws v0.1.1 h1:lbCu/sCQ7xk3bSzf/V7QMOvBJ9+P7hRAr8y3JTfvxtg=
-github.com/hashicorp/consul-aws v0.1.1/go.mod h1:Q56eCL2G8mv1aXFj+PzrTYP8jWiE9T2YKtA6/t7llNw=
+github.com/hashicorp/eureka-aws v0.1.1 h1:lbCu/sCQ7xk3bSzf/V7QMOvBJ9+P7hRAr8y3JTfvxtg=
+github.com/hashicorp/eureka-aws v0.1.1/go.mod h1:Q56eCL2G8mv1aXFj+PzrTYP8jWiE9T2YKtA6/t7llNw=
 github.com/hashicorp/errwrap v1.0.0 h1:hLrqtEDnRye3+sgx6z4qVLNuviH3MR5aQ0ykNJa/UYA=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/go-cleanhttp v0.5.0 h1:wvCrVc9TjDls6+YGAF2hAifE1E5U1+b4tH6KdvN3Gig=

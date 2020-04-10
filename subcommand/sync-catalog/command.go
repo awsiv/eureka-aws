@@ -21,17 +21,16 @@ const DefaultPollInterval = "30s"
 type Command struct {
 	UI cli.Ui
 
-	flags                         *flag.FlagSet
-	http                          *flags.HTTPFlags
-	flagToConsul                  bool
-	flagToAWS                     bool
-	flagAWSNamespaceID            string
-	flagAWSServicePrefix          string
-	flagAWSDeprecatedPullInterval string
-	flagAWSPollInterval           string
-	flagAWSDNSTTL                 int64
-	flagConsulServicePrefix       string
-	flagConsulDomain              string
+	flags                   *flag.FlagSet
+	http                    *flags.HTTPFlags
+	flagToEureka            bool
+	flagToAWS               bool
+	flagAWSNamespaceID      string
+	flagAWSServicePrefix    string
+	flagAWSPollInterval     string
+	flagAWSDNSTTL           int64
+	flagEurekaServicePrefix string
+	flagEurekaDomain        string
 
 	once sync.Once
 	help string
@@ -39,23 +38,18 @@ type Command struct {
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flags.BoolVar(&c.flagToConsul, "to-consul", false,
-		"If true, AWS services will be synced to Consul. (Defaults to false)")
+	c.flags.BoolVar(&c.flagToEureka, "to-eureka", false,
+		"If true, AWS services will be synced to Eureka. (Defaults to false)")
 	c.flags.BoolVar(&c.flagToAWS, "to-aws", false,
-		"If true, Consul services will be synced to AWS. (Defaults to false)")
+		"If true, Eureka services will be synced to AWS. (Defaults to false)")
 	c.flags.StringVar(&c.flagAWSNamespaceID, "aws-namespace-id",
-		"", "The AWS namespace to sync with Consul services.")
+		"", "The AWS namespace to sync with Eureka services.")
 	c.flags.StringVar(&c.flagAWSServicePrefix, "aws-service-prefix",
-		"", "A prefix to prepend to all services written to AWS from Consul. "+
+		"", "A prefix to prepend to all services written to AWS from Eureka. "+
 			"If this is not set then services will have no prefix.")
-	c.flags.StringVar(&c.flagConsulServicePrefix, "consul-service-prefix",
-		"", "A prefix to prepend to all services written to Consul from AWS. "+
+	c.flags.StringVar(&c.flagEurekaServicePrefix, "eureka-service-prefix",
+		"", "A prefix to prepend to all services written to Eureka from AWS. "+
 			"If this is not set then services will have no prefix.")
-	c.flags.StringVar(&c.flagAWSDeprecatedPullInterval, "aws-pull-interval",
-		DefaultPollInterval, "[DEPRECATED] The interval between fetching from AWS CloudMap. "+
-			"Accepts a sequence of decimal numbers, each with optional "+
-			"fraction and a unit suffix, such as \"300ms\", \"10s\", \"1.5m\". "+
-			"Defaults to 30s)")
 	c.flags.StringVar(&c.flagAWSPollInterval, "aws-poll-interval",
 		DefaultPollInterval, "The interval between fetching from AWS CloudMap. "+
 			"Accepts a sequence of decimal numbers, each with optional "+
@@ -108,8 +102,8 @@ func (c *Command) Run(args []string) int {
 	stop := make(chan struct{})
 	stopped := make(chan struct{})
 	go catalog.Sync(
-		c.flagToAWS, c.flagToConsul, c.flagAWSNamespaceID,
-		c.flagConsulServicePrefix, c.flagAWSServicePrefix,
+		c.flagToAWS, c.flagToEureka, c.flagAWSNamespaceID,
+		c.flagEurekaServicePrefix, c.flagAWSServicePrefix,
 		"60s", c.flagAWSDNSTTL, c.getStaleWithDefaultTrue(),
 		awsClient, eurekaClient,
 		stop, stopped,
@@ -148,9 +142,9 @@ func (c *Command) Help() string {
 
 const synopsis = "Sync AWS services and Eureka services."
 const help = `
-Usage: consul-aws sync-catalog [options]
+Usage: eureka-aws sync-catalog [options]
 
-  Sync AWS services, and more with the Consul service catalog.
+  Sync AWS services, and more with the Eureka service catalog.
   This enables AWS services to discover and communicate with external
   services, and allows external services to discover and communicate with
   AWS services.

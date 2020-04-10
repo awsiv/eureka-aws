@@ -1,6 +1,6 @@
 function refresh_docker_images {
    # Arguments:
-   #   $1 - Path to top level Consul source
+   #   $1 - Path to top level Eureka source
    #   $2 - Which make target to invoke (optional)
    #
    # Return:
@@ -24,7 +24,7 @@ function refresh_docker_images {
 
 function build_consul_post {
    # Arguments
-   #   $1 - Path to the top level Consul source
+   #   $1 - Path to the top level Eureka source
    #   $2 - Subdirectory under pkg/bin (Optional)
    #
    # Returns:
@@ -80,7 +80,7 @@ function build_consul_post {
 
 function build_consul {
    # Arguments:
-   #   $1 - Path to the top level Consul source
+   #   $1 - Path to the top level Eureka source
    #   $2 - Subdirectory to put binaries in under pkg/bin (optional - must specify if needing to specify the docker image)
    #   $3 - The docker image to run the build within (optional)
    #
@@ -166,7 +166,7 @@ function build_consul {
 
 function build_consul_local {
    # Arguments:
-   #   $1 - Path to the top level Consul source
+   #   $1 - Path to the top level Eureka source
    #   $2 - Space separated string of OSes to build. If empty will use env vars for determination.
    #   $3 - Space separated string of architectures to build. If empty will use env vars for determination.
    #   $4 - Subdirectory to put binaries in under pkg/bin (optional)
@@ -230,7 +230,7 @@ function build_consul_local {
    is_set "${NOGOX}" && use_gox=0
    which gox > /dev/null || use_gox=0
 
-   status_stage "==> Building Consul - OSes: ${build_os}, Architectures: ${build_arch}"
+   status_stage "==> Building Eureka - OSes: ${build_os}, Architectures: ${build_arch}"
    mkdir pkg.bin.new 2> /dev/null
    if is_set "${use_gox}"
    then
@@ -247,7 +247,7 @@ function build_consul_local {
 
       if test $? -ne 0
       then
-         err "ERROR: Failed to build Consul"
+         err "ERROR: Failed to build Eureka"
          rm -r pkg.bin.new
          return 1
       fi
@@ -281,7 +281,7 @@ function build_consul_local {
             CGO_ENABLED=0 GOOS=${os} GOARCH=${arch} go install -ldflags "${GOLDFLAGS}" -tags "${GOTAGS}" && cp "${MAIN_GOPATH}/bin/${GOBIN_EXTRA}${PROJECT}" "${outdir}/${PROJECT}"
             if test $? -ne 0
             then
-               err "ERROR: Failed to build Consul for ${osarch}"
+               err "ERROR: Failed to build Eureka for ${osarch}"
                rm -r pkg.bin.new
                return 1
             fi
@@ -292,7 +292,7 @@ function build_consul_local {
    build_consul_post "${sdir}" "${extra_dir_name}"
    if test $? -ne 0
    then
-      err "ERROR: Failed postprocessing Consul binaries"
+      err "ERROR: Failed postprocessing Eureka binaries"
       return 1
    fi
    return 0

@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Description:
-#   This script will publish consul-aws containers to Dockerhub. It should only run on tagged
+#   This script will publish eureka-aws containers to Dockerhub. It should only run on tagged
 #   branches within CI and all the variables needed are populated either by CircleCI or the Makefile.
 
 #   To publish a new container, make sure the following environment variables are set:
-#     * CIRCLE_TAG - the version of the consul-aws binary you want to build an image for
+#     * CIRCLE_TAG - the version of the eureka-aws binary you want to build an image for
 #     * DOCKER_ORG - to the organization of the docker image
 #     * DOCKER_IMAGE_NAME - to the name of the docker image
 
@@ -19,7 +19,7 @@ function get_latest_docker_version {
    #   0 - success (version in the 'latest' container echoed)
    #   1 - 'latest' tag does not exist or label could not be found
 
-   docker_latest=$(docker inspect --format='{{ index .Config.Labels "consul-aws.version" }}' "$1"/"$2":latest 2> /dev/null)
+   docker_latest=$(docker inspect --format='{{ index .Config.Labels "eureka-aws.version" }}' "$1"/"$2":latest 2> /dev/null)
 
    if [ -z "$docker_latest" ]; then
       return 1
@@ -38,7 +38,7 @@ function get_latest_docker_minor_version {
    # Returns:
    #   0 - success (version in the latest minor version container echoed)
    #   1 - tag does not exist or label could not be found
-   docker_latest_minor=$(docker inspect --format='{{ index .Config.Labels "consul-aws.version" }}' "$1"/"$2":"$3" 2> /dev/null)
+   docker_latest_minor=$(docker inspect --format='{{ index .Config.Labels "eureka-aws.version" }}' "$1"/"$2":"$3" 2> /dev/null)
 
    if [ -z "$docker_latest_minor" ]; then
       return 1
