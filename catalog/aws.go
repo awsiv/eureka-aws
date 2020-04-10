@@ -20,6 +20,14 @@ type namespace struct {
 	isHTTP bool
 }
 
+const (
+	// EurekaAWSTag is used for imported services from AWS
+	EurekaAWSTag    = "aws"
+	EurekaSourceKey = "external-source"
+	EurekaAWSNS     = "external-aws-ns"
+	EurekaAWSID     = "external-aws-id"
+)
+
 type aws struct {
 	lock         sync.RWMutex
 	client       *sd.Client
@@ -354,7 +362,7 @@ func (a *aws) create(services map[string]service) int {
 			if !a.namespace.isHTTP {
 				input.DnsConfig = &sd.DnsConfig{
 					DnsRecords: []sd.DnsRecord{
-						{TTL: &a.dnsTTL, Type: sd.RecordTypeA},
+						//{TTL: &a.dnsTTL, Type: sd.RecordTypeA},
 						{TTL: &a.dnsTTL, Type: sd.RecordTypeSrv},
 					},
 				}
