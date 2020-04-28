@@ -1,6 +1,8 @@
 # Eureka-AWS
 
-`eureka-aws` syncs the services in an AWS CloudMap namespace to a Eureka datacenter. Eureka services will be created in AWS CloudMap and the other way around. This enables native service discovery across Eureka and AWS CloudMap.
+Based on `consul-aws`: https://github.com/hashicorp/consul-aws
+
+`eureka-aws` syncs the services in Eureka toAWS Cloudmap Namespace. Eureka services will be created in AWS CloudMap and the other way around. This enables native service discovery across Eureka and AWS CloudMap.
 
 This project is versioned separately from Eureka. Supported Eureka versions for each feature will be noted below. By versioning this project separately, we can iterate on AWS integrations more quickly and release new versions without forcing Eureka users to do a full Eureka upgrade.
 
@@ -49,7 +51,7 @@ You will also need to install the Docker engine:
 Clone the repository:
 
 ```shell
-$ git clone https://github.com/hashicorp/eureka-aws.git
+$ git clone https://github.com/awsiv/eureka-aws.git
 ```
 
 To compile the `eureka-aws` binary for your local machine:
