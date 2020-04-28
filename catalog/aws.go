@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DataDog/datadog-go/statsd"
 	x "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/awserr"
 	sd "github.com/aws/aws-sdk-go-v2/service/servicediscovery"
@@ -31,6 +32,7 @@ const (
 type aws struct {
 	lock         sync.RWMutex
 	client       *sd.Client
+	dd           *statsd.Client
 	log          hclog.Logger
 	namespace    namespace
 	services     map[string]service
@@ -98,6 +100,15 @@ func (a *aws) fetchServices() ([]sd.ServiceSummary, error) {
 	}
 	a.log.Debug("fetchServices()", "resp", resp)
 	a.log.Info("fetchServices()", "count", len(resp.Services))
+
+	err = a.dd.Gauge("eureka_aws.sync.aws.services.count",
+		float64(len(resp.Services)),
+		[]string{"environment:stage-v2"}, 1)
+
+	if err != nil {
+		a.log.Error("Unable to post to statsd", "error", err)
+	}
+
 	services := resp.Services
 	return services, nil
 }
@@ -165,9 +176,9 @@ func (a *aws) fetch() error {
 		s.nodes = nodes
 
 		healths, err := a.fetchHealths(s.awsID)
-		a.log.Debug("fetch()", "healths", healths)
+		a.log.Info("fetch()", "healths", healths, "awsID", s.awsID)
 		if err != nil {
-			a.log.Error("cannot fetch healths", "error", err)
+			a.log.Error("fetch(): cannot fetch healths", "error", err)
 		} else {
 			if s.fromEureka {
 				healths = a.rekeyHealths(s.name, healths)
@@ -349,16 +360,17 @@ func (a *aws) create(services map[string]service) int {
 			continue
 		}
 		name := a.eurekaPrefix + k
-		a.log.Debug("create()", "awsServiceName", name, "namespace", a.namespace.id)
+		a.log.Info("create()", "awsServiceName", name, "namespace", a.namespace.id)
 		if len(s.awsID) == 0 {
 			input := sd.CreateServiceInput{
 				Description: &awsServiceDescription,
 				Name:        &name,
 				NamespaceId: &a.namespace.id,
 				HealthCheckCustomConfig: &sd.HealthCheckCustomConfig{
-					FailureThreshold: x.Int64(10),
+					FailureThreshold: x.Int64(5),
 				},
 			}
+
 			if !a.namespace.isHTTP {
 				input.DnsConfig = &sd.DnsConfig{
 					DnsRecords: []sd.DnsRecord{
@@ -374,9 +386,11 @@ func (a *aws) create(services map[string]service) int {
 					switch err.Code() {
 					case sd.ErrCodeServiceAlreadyExists:
 						a.log.Info("service already exists", "name", name)
+					default:
+						a.log.Error("cannot create services in AWS", "error", err)
 					}
 				} else {
-					a.log.Error("cannot create services in AWS", "error", err.Error())
+					a.log.Error("cannot create services in AWS", "error", err)
 				}
 				continue
 			}
@@ -393,9 +407,13 @@ func (a *aws) create(services map[string]service) int {
 					wg.Done()
 					instanceID := n.instanceID //id(serviceID, h, n.port)
 					attributes := n.attributes
-					attributes["AWS_INSTANCE_IPV4"] = n.attributes["local-ipv4"]
+					if len(n.attributes["local-ipv4"]) > 0 {
+						attributes["AWS_INSTANCE_IPV4"] = n.attributes["local-ipv4"]
+					} else {
+						attributes["AWS_INSTANCE_IPV4"] = n.host
+					}
+
 					attributes["AWS_INSTANCE_PORT"] = fmt.Sprintf("%d", n.port)
-					//attributes["public-ipv4"] = n.attributes[]
 
 					req := a.client.RegisterInstanceRequest(&sd.RegisterInstanceInput{
 						ServiceId:  &serviceID,
@@ -404,15 +422,28 @@ func (a *aws) create(services map[string]service) int {
 					})
 					_, err := req.Send(context.Background())
 					if err != nil {
-						a.log.Error("cannot register node", "error", err.Error())
+						a.log.Error("cannot register node", "error", err)
+						err := a.dd.Count("eureka_aws.sync.aws.instances.update_error",
+							int64(count),
+							[]string{}, 1)
+
+						if err != nil {
+							a.log.Error("Unable to post to statsd", "error", err)
+						}
 					} else {
 						a.log.Info("Registered node", "ID", instanceID, "service", serviceID, "ip", h, "ns", a.namespace.id)
 					}
 				}(s.awsID, name, h, n)
 			}
+			err := a.dd.Count("eureka_aws.sync.aws.services.updated_count",
+				1,
+				[]string{}, 1)
+
+			if err != nil {
+				a.log.Error("Unable to post to statsd", "error", err)
+			}
 		}
 		for instanceID, h := range s.healths {
-			a.log.Debug("create()", "serviceID", s.awsID, "instanceID", instanceID, "health", statusToCustomHealth(h), "status", h)
 			wg.Add(1)
 			go func(serviceID, instanceID string, h health) {
 				defer wg.Done()
@@ -423,14 +454,32 @@ func (a *aws) create(services map[string]service) int {
 				})
 				_, err := req.Send(context.Background())
 				if err != nil {
-					a.log.Error("cannot create custom health", "error", err.Error())
+					// Can be ignored for the first time
+					err := a.dd.Count("eureka_aws.sync.aws.instances.health_update_error",
+						1,
+						[]string{}, 1)
+
+					if err != nil {
+						a.log.Error("Unable to post to statsd", "error", err)
+					}
+
+					a.log.Error("cannot create custom health", "error", err)
 				} else {
+					err := a.dd.Count("eureka_aws.sync.aws.instances.health_updated",
+						1,
+						[]string{}, 1)
+
+					if err != nil {
+						a.log.Error("Unable to post to statsd", "error", err)
+					}
+
 					a.log.Info("custom health status updated", "service", serviceID, "instance", instanceID, "new status", h)
 				}
 			}(s.awsID, instanceID, h)
 		}
+		wg.Wait()
 	}
-	wg.Wait()
+
 	return count
 }
 
@@ -454,7 +503,7 @@ func (a *aws) remove(services map[string]service) int {
 					})
 					_, err := req.Send(context.Background())
 					if err != nil {
-						a.log.Error("cannot remove instance", "error", err.Error())
+						a.log.Error("cannot remove instance", "error", err)
 					} else {
 						// TODO:  remove instance from struct
 						//delete(nodes, n)
@@ -479,9 +528,10 @@ func (a *aws) remove(services map[string]service) int {
 		})
 		_, err := req.Send(context.Background())
 		if err != nil {
-			a.log.Error("cannot remove services", "name", k, "id", s.awsID, "error", err.Error())
+			a.log.Error("cannot remove services", "name", k, "id", s.awsID, "error", err)
 		} else {
 			// todo remove service from srtuct
+
 			count++
 		}
 	}
@@ -504,7 +554,7 @@ func (a *aws) fetchIndefinetely(stop, stopped chan struct{}) {
 	for {
 		err := a.fetch()
 		if err != nil {
-			a.log.Error("error fetching", "error", err.Error())
+			a.log.Error("error fetching", "error", err)
 		} else {
 			a.trigger <- true
 		}

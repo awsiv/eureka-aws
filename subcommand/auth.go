@@ -7,8 +7,5 @@ import (
 
 func AWSConfig() (aws.Config, error) {
 	// TODO: read from ENV, use ec2metadata
-	return external.LoadDefaultAWSConfig(
-		external.WithSharedConfigProfile("tidal-stage"),
-		external.WithRegion("us-east-1"),
-	)
+	return external.LoadDefaultAWSConfig()
 }

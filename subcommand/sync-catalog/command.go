@@ -45,7 +45,7 @@ func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.BoolVar(&c.flagToEureka, "to-eureka", false,
 		"If true, AWS services will be synced to Eureka. (Defaults to false)")
-	c.flags.BoolVar(&c.flagToAWS, "to-aws", false,
+	c.flags.BoolVar(&c.flagToAWS, "to-aws", true,
 		"If true, Eureka services will be synced to AWS. (Defaults to false)")
 	c.flags.StringVar(&c.flagAWSNamespaceID, "aws-namespace-id",
 		"", "The AWS namespace to sync with Eureka services.")
@@ -82,16 +82,32 @@ func getStackTraceHandler() {
 
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
-	if err := c.flags.Parse(args); err != nil {
-		return 1
-	}
+
 	if len(c.flags.Args()) > 0 {
 		c.UI.Error("Should have no non-flag arguments.")
 		return 1
 	}
+
+	c.flagAWSNamespaceID = os.Getenv("CLOUDMAP_NAMESPACE")
 	if len(c.flagAWSNamespaceID) == 0 {
-		c.UI.Error("Please provide -aws-namespace-id.")
+		c.UI.Error("Environment CLOUDMAP_NAMESPACE is not set")
 		return 1
+	}
+
+	c.flagEurekaDomain = os.Getenv("EUREKA_DOMAIN")
+	if len(c.flagEurekaDomain) == 0 {
+		c.UI.Error("Environment EUREKA_DOMAIN is not set")
+		return 1
+	}
+
+	pollInterval := os.Getenv("POLL_INTERVAL")
+	if len(pollInterval) > 0 {
+		c.flagAWSPollInterval = pollInterval
+	}
+
+	awsDnsTTL, err := strconv.ParseInt(os.Getenv("AWS_DNS_TTL"), 10, 64)
+	if err != nil && awsDnsTTL > 0 && awsDnsTTL < 60 {
+		c.flagAWSDNSTTL = awsDnsTTL
 	}
 
 	//Note:
@@ -108,12 +124,17 @@ func (c *Command) Run(args []string) int {
 
 	//return 1
 	eurekaClient := _e.NewClient([]string{
-		"http://ec2-52-70-156-143.compute-1.amazonaws.com:8080/eureka/v2",
+		c.flagEurekaDomain,
 	})
 	if eurekaClient == nil {
 		c.UI.Error(fmt.Sprintf("Error connecting to Eureka agent: %s", err))
 		return 1
 	}
+
+	c.UI.Info(fmt.Sprintf("Polling Interval = %s", c.flagAWSPollInterval))
+	c.UI.Info(fmt.Sprintf("Namespace ID = %s", c.flagAWSNamespaceID))
+	c.UI.Info(fmt.Sprintf("DNS TTL = %d", c.flagAWSDNSTTL))
+	c.UI.Info(fmt.Sprintf("Eureka domain = %s", c.flagEurekaDomain))
 
 	stop := make(chan struct{})
 	stopped := make(chan struct{})

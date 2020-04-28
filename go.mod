@@ -2,7 +2,10 @@ module github.com/awsiv/eureka-aws
 
 require (
 	github.com/ArthurHlt/go-eureka-client v1.1.0
+	github.com/DataDog/datadog-go v3.6.0+incompatible
+	github.com/apex/log v1.1.4
 	github.com/aws/aws-sdk-go-v2 v0.20.0
+	github.com/cactus/go-statsd-client/statsd v0.0.0-20200423205355-cb0885a1018c
 	github.com/hashicorp/consul v1.4.0
 	github.com/hashicorp/go-cleanhttp v0.5.1 // indirect
 	github.com/hashicorp/go-hclog v0.12.2
