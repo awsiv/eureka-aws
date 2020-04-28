@@ -59,7 +59,7 @@ func TestEurekaTransformServices(t *testing.T) {
 						HomePageUrl:    "s1-homepageUrl",
 						StatusPageUrl:  "s1-statuspageUrl",
 						HealthCheckUrl: "s1-healthcheckUrl",
-						IpAddr:         "127.0.0.1",
+						IpAddr:         "1.1.1.1",
 						InstanceID:     "i-nstanceIDs1",
 						Status:         "UP",
 						Port: &_e.Port{
@@ -91,7 +91,7 @@ func TestEurekaTransformServices(t *testing.T) {
 						HomePageUrl:    "s2-homepageUrl",
 						StatusPageUrl:  "s2-statuspageUrl",
 						HealthCheckUrl: "s2-healthcheckUrl",
-						IpAddr:         "127.0.0.1",
+						IpAddr:         "1.1.1.2",
 						InstanceID:     "i-nstanceID",
 						Status:         "OUT_OF_SERVICE",
 						Port: &_e.Port{
@@ -99,14 +99,7 @@ func TestEurekaTransformServices(t *testing.T) {
 							Enabled: true,
 						},
 						DataCenterInfo: &_e.DataCenterInfo{
-							Metadata: &_e.DataCenterMetadata{
-								InstanceId:       "i-nstanceIDs2",
-								LocalIpv4:        "1.1.1.2",
-								LocalHostname:    "s2-private-hostname",
-								PublicHostname:   "s2-public-hostname",
-								PublicIpv4:       "9.9.9.9",
-								AvailabilityZone: "us-east-1e",
-							},
+							Name: "test",
 						},
 						LeaseInfo:  &_e.LeaseInfo{},
 						Metadata:   &_e.MetaData{},
@@ -129,14 +122,9 @@ func TestEurekaTransformServices(t *testing.T) {
 		"healthCheckUrl":    "s1-healthcheckUrl",
 	}
 	attributes_s2 := map[string]string{
-		"local-ipv4":        "1.1.1.2",
-		"local-hostname":    "s2-private-hostname",
-		"public-hostname":   "s2-public-hostname",
-		"public-ipv4":       "9.9.9.9",
-		"availability-zone": "us-east-1e",
-		"homePageUrl":       "s2-homepageUrl",
-		"statusPageUrl":     "s2-statuspageUrl",
-		"healthCheckUrl":    "s2-healthcheckUrl",
+		"homePageUrl":    "s2-homepageUrl",
+		"statusPageUrl":  "s2-statuspageUrl",
+		"healthCheckUrl": "s2-healthcheckUrl",
 	}
 
 	nodes_s1 := map[string]map[int]node{
@@ -145,7 +133,7 @@ func TestEurekaTransformServices(t *testing.T) {
 
 	nodes_s2 := map[string]map[int]node{
 		// structure = ip : {port:{ ... }}
-		"1.1.1.2": {2: {port: 2, host: "1.1.1.2", awsID: "s2", eurekaID: "s2", instanceID: "i-nstanceIDs2", attributes: attributes_s2}},
+		"1.1.1.2": {2: {port: 2, host: "1.1.1.2", awsID: "s2", eurekaID: "s2", instanceID: "1.1.1.2", attributes: attributes_s2}},
 		//		"1.1.1.3": {3: {port: 3, host: "1.1.1.3", eurekaID: "s2", instanceID: "i-nstanceIDs2", attributes: attributes_s2}},
 	}
 
@@ -153,7 +141,7 @@ func TestEurekaTransformServices(t *testing.T) {
 		"i-nstanceIDs1": healthy,
 	}
 	health_s2 := map[string]health{
-		"i-nstanceIDs2": unhealthy,
+		"1.1.1.2": unhealthy,
 		//	"s3": unknown,
 	}
 

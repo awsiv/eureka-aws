@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_e "github.com/ArthurHlt/go-eureka-client/eureka"
+	"github.com/DataDog/datadog-go/statsd"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -23,6 +24,7 @@ const (
 type eureka struct {
 	client       *_e.Client
 	log          hclog.Logger
+	dd           *statsd.Client
 	eurekaPrefix string
 	awsPrefix    string
 	services     map[string]service
@@ -121,7 +123,6 @@ func (e *eureka) sync(aws *aws, stop, stopped chan struct{}) {
 			if !e.toAWS {
 				continue
 			}
-			// todo: enable this once everything working
 			create := onlyInFirst(e.getServices(), aws.getServices())
 			count := aws.create(create)
 			if count > 0 {
@@ -147,25 +148,32 @@ func (e *eureka) transformNodes(cnodes []_e.InstanceInfo) map[string]map[int]nod
 	attributes := make(map[string]string)
 
 	for _, n := range cnodes {
-		privateip := n.DataCenterInfo.Metadata.LocalIpv4
-
-		if nodes[privateip] == nil {
-			nodes[privateip] = map[int]node{}
+		address := n.IpAddr
+		if len(address) == 0 {
+			address = n.HostName
 		}
 
-		ports := nodes[privateip]
+		instanceID := address
+		if nodes[address] == nil {
+			nodes[address] = map[int]node{}
+		}
 
-		attributes["public-ipv4"] = n.DataCenterInfo.Metadata.PublicIpv4
-		attributes["local-ipv4"] = n.DataCenterInfo.Metadata.LocalIpv4
-		attributes["public-hostname"] = n.DataCenterInfo.Metadata.PublicHostname
-		attributes["local-hostname"] = n.DataCenterInfo.Metadata.LocalHostname
-		attributes["availability-zone"] = n.DataCenterInfo.Metadata.AvailabilityZone
+		ports := nodes[address]
+
+		if n.DataCenterInfo.Metadata != nil {
+			attributes["public-ipv4"] = n.DataCenterInfo.Metadata.PublicIpv4
+			attributes["local-ipv4"] = n.DataCenterInfo.Metadata.LocalIpv4
+			attributes["public-hostname"] = n.DataCenterInfo.Metadata.PublicHostname
+			attributes["local-hostname"] = n.DataCenterInfo.Metadata.LocalHostname
+			attributes["availability-zone"] = n.DataCenterInfo.Metadata.AvailabilityZone
+			instanceID = n.DataCenterInfo.Metadata.InstanceId
+		}
 		attributes["homePageUrl"] = n.HomePageUrl
 		attributes["statusPageUrl"] = n.StatusPageUrl
 		attributes["healthCheckUrl"] = n.HealthCheckUrl
 
-		ports[n.Port.Port] = node{port: n.Port.Port, host: attributes["local-ipv4"], eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: n.DataCenterInfo.Metadata.InstanceId}
-		nodes[privateip] = ports
+		ports[n.Port.Port] = node{port: n.Port.Port, host: address, eurekaID: n.App, awsID: n.App, attributes: attributes, instanceID: instanceID}
+		nodes[address] = ports
 		//e.log.Debug("transformNodes()", "port", n.Port.Port, "ipAddr", n.IpAddr, "attributes", attributes, "instanceId", n.DataCenterInfo.Metadata.InstanceId)
 	}
 	return nodes
@@ -184,7 +192,12 @@ func (e *eureka) transformHealth(ehealths []_e.InstanceInfo) map[string]health {
 	healths := map[string]health{}
 
 	for _, h := range ehealths {
-		instanceId := h.DataCenterInfo.Metadata.InstanceId
+		instanceId := h.IpAddr
+
+		if h.DataCenterInfo.Metadata != nil {
+			instanceId = h.DataCenterInfo.Metadata.InstanceId
+		}
+
 		//e.log.Info("transformHealth()", "instanceID", instanceId, "status", h.Status)
 
 		switch h.Status {
@@ -218,6 +231,16 @@ func (e *eureka) fetchServices() (*_e.Applications, error) {
 	if err != nil {
 		return apps, err
 	}
+	e.log.Info("fetch()", "count", len(apps.Applications))
+
+	err = e.dd.Gauge("eureka_aws.sync.eureka.services.count",
+		float64(len(apps.Applications)),
+		[]string{}, 1)
+
+	if err != nil {
+		e.log.Error("Unable to post to statsd", "error", err)
+	}
+
 	return apps, nil
 }
 
@@ -226,31 +249,31 @@ func (e *eureka) fetch() error {
 	if err != nil {
 		return fmt.Errorf("error fetching services: %s", err)
 	}
-	services := e.transformServices(apps)
 
+	services := e.transformServices(apps)
 	e.setServices(services)
-	//fmt.Printf("services: %v", services)
 	return nil
 }
 
 func (e *eureka) transformServices(apps *_e.Applications) map[string]service {
 	services := make(map[string]service, len(apps.Applications))
+	count := 0
 	for _, v := range apps.Applications {
-		//TODO: bishwa
-		if v.Name == "CORNELIUS" || v.Name == "s1" || v.Name == "s2" || v.Name == "s3" {
-			s := service{id: v.Name, name: v.Name, eurekaID: v.Name, fromEureka: true}
-			/*
-				if s.fromAWS {
-					s.name = strings.TrimPrefix(v.Name, e.awsPrefix)
-				}
-			*/
+		//if count < 10 {
+		//if v.Name == "CORNELIUS" || v.Name == "s1" || v.Name == "s2" || v.Name == "s3" {
+		s := service{id: v.Name, name: v.Name, eurekaID: v.Name, fromEureka: true}
+		/*
+			if s.fromAWS {
+				s.name = strings.TrimPrefix(v.Name, e.awsPrefix)
+			}
+		*/
 
-			//e.log.Info("transformServices()", "serviceName", v.Name)
-			s.nodes = e.transformNodes(v.Instances)
-			s.healths = e.transformHealth(v.Instances)
+		//e.log.Info("transformServices()", "serviceName", v.Name, "nodes", len(v.Instances))
+		s.nodes = e.transformNodes(v.Instances)
+		s.healths = e.transformHealth(v.Instances)
 
-			services[s.name] = s
-		}
+		services[s.name] = s
+		count++
 	}
 	return services
 }
@@ -282,7 +305,7 @@ func (e *eureka) fetchIndefinetely(stop, stopped chan struct{}) {
 	for {
 		err := e.fetch()
 		if err != nil {
-			e.log.Error("error fetching", "error", err.Error())
+			e.log.Error("error fetching", "error", err)
 		} else {
 			e.trigger <- true
 		}

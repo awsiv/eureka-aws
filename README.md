@@ -26,6 +26,17 @@ Apart from that a AWS CloudMap namespace id has to be provided. This is how `eur
 $ ./eureka-aws sync-catalog -aws-namespace-id ns-hjrgt3bapp7phzff -to-aws -to-eureka
 ```
 
+```shell
+# Running container with environment variables
+export CLOUDMAP_NAMESPACE=ns-zsexdrcft
+export EUREKA_DOMAIN=http://<url>/eureka/v2
+export POLL_INTERVAL=60s
+export AWS_DNS_TTL=30
+
+$ docker run -it -env CLOUDMAP_NAMESPACE -env EUREKA_DOMAIN -env POLL_INTERVAL -env AWS_DNS_TTL  src/eureka-aws:latest sync-catalog
+
+```
+
 ## Contributing
 
 To build and install `eureka-aws` locally, Go version 1.11+ is required because this repository uses go modules.

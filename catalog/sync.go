@@ -4,6 +4,7 @@ import (
 	"time"
 
 	_e "github.com/ArthurHlt/go-eureka-client/eureka"
+	"github.com/DataDog/datadog-go/statsd"
 	sd "github.com/aws/aws-sdk-go-v2/service/servicediscovery"
 	"github.com/hashicorp/go-hclog"
 )
@@ -31,6 +32,11 @@ func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInt
 		pullInterval: pullInterval,
 	}
 
+	eureka.dd, err = statsd.New("127.0.0.1:8125")
+	if err != nil {
+		log.Error("Unable to init statsd", "error", err)
+	}
+
 	aws := aws{
 		client:       awsClient,
 		log:          hclog.Default().Named("aws"),
@@ -40,6 +46,11 @@ func Sync(toAWS, toEureka bool, namespaceID, eurekaPrefix, awsPrefix, awsPullInt
 		toEureka:     toEureka,
 		pullInterval: pullInterval,
 		dnsTTL:       awsDNSTTL,
+	}
+
+	aws.dd, err = statsd.New("127.0.0.1:8125")
+	if err != nil {
+		log.Error("Unable to init statsd", "error", err)
 	}
 
 	err = aws.setupNamespace(namespaceID)
